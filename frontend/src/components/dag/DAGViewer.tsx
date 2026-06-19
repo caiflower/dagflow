@@ -30,6 +30,9 @@ interface DAGViewerProps {
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect?: (params: Connection) => void;
+  onNodeClick?: (nodeId: string) => void;
+  onPaneClick?: () => void;
+  selectedNodeId?: string;
   nodeStates?: Record<string, string>;
 }
 
@@ -40,8 +43,21 @@ export default function DAGViewer({
   onNodesChange,
   onEdgesChange,
   onConnect: externalOnConnect,
+  onNodeClick,
+  onPaneClick,
+  selectedNodeId,
 }: DAGViewerProps) {
   const isReadOnly = mode === 'preview';
+
+  // 将选中状态注入 node data
+  const nodesWithSelection = useMemo(
+    () =>
+      nodes.map((n) => ({
+        ...n,
+        data: { ...n.data, selected: n.id === selectedNodeId },
+      })),
+    [nodes, selectedNodeId],
+  );
 
   const handleConnect = useCallback(
     (params: Connection) => {
@@ -60,15 +76,24 @@ export default function DAGViewer({
     [],
   );
 
+  const handleNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      onNodeClick?.(node.id);
+    },
+    [onNodeClick],
+  );
+
   return (
     <ReactFlow
-      nodes={nodes}
+      nodes={nodesWithSelection}
       edges={edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       onNodesChange={isReadOnly ? undefined : onNodesChange}
       onEdgesChange={isReadOnly ? undefined : onEdgesChange}
       onConnect={handleConnect}
+      onNodeClick={isReadOnly ? undefined : handleNodeClick}
+      onPaneClick={isReadOnly ? undefined : onPaneClick}
       nodesDraggable={!isReadOnly}
       nodesConnectable={!isReadOnly}
       elementsSelectable={!isReadOnly}

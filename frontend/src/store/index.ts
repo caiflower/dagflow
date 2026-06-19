@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Flow, FlowNode, FlowEdge, Protocol, Execution } from '../types';
+import type { Flow, FlowNode, FlowEdge, Protocol, Execution, NodeInput } from '../types';
 import { flowApi, protocolApi, executionApi } from '../api/client';
 
 interface FlowStore {
@@ -71,7 +71,7 @@ interface ExecutionStore {
   executions: Execution[];
   currentExec: Execution | null;
   loading: boolean;
-  runFlow: (flowId: number) => Promise<Execution>;
+  runFlow: (flowId: number, nodeInputs?: NodeInput[]) => Promise<Execution>;
   pollExecution: (id: string) => Promise<void>;
   loadExecutions: () => Promise<void>;
 }
@@ -81,8 +81,8 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
   currentExec: null,
   loading: false,
 
-  runFlow: async (flowId: number) => {
-    const exec = await executionApi.run(flowId);
+  runFlow: async (flowId: number, nodeInputs?: NodeInput[]) => {
+    const exec = await executionApi.run(flowId, nodeInputs);
     set((s) => ({ executions: [exec, ...s.executions], currentExec: exec }));
     // Start polling
     get().pollExecution(exec.id);

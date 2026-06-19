@@ -168,7 +168,7 @@ func initDB() {
 			IfNotExists().
 			Exec(ctx)
 		if err != nil {
-			logger.Error("failed to create table: " + err.Error())
+			logger.Error("failed to create table: %v", err.Error())
 		}
 	}
 

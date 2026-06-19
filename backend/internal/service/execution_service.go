@@ -50,7 +50,8 @@ type ExecutionService struct {
 
 // RunFlowReq 执行 Flow 请求
 type RunFlowReq struct {
-	FlowID int64 `json:"flowId" verf:"required"`
+	FlowID     int64             `json:"flowId" verf:"required"`
+	NodeInputs map[string]string `json:"nodeInputs"` // nodeName → JSON input
 }
 
 // Run 触发 Flow 执行
@@ -67,7 +68,7 @@ func (s *ExecutionService) Run(ctx context.Context, req *RunFlowReq) (*Execution
 	}
 
 	// 使用 FlowToTask 构建 taskx.Task，使用 createProvider 作为 provider 工厂
-	task, err := converter.FlowToTask(flow, createProvider)
+	task, err := converter.FlowToTask(flow, createProvider, req.NodeInputs)
 	if err != nil {
 		return nil, fmt.Errorf("build task: %w", err)
 	}

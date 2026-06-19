@@ -18,7 +18,14 @@ func NewExecutionGrpcService(svc *service.ExecutionService) *ExecutionGrpcServic
 }
 
 func (s *ExecutionGrpcService) Run(ctx context.Context, req *pb.RunFlowRequest) (*pb.ExecutionResponse, error) {
-	exec, err := s.svc.Run(ctx, &service.RunFlowReq{FlowID: req.FlowId})
+	// 将 proto NodeInput 转换为 map[nodeName]input
+	nodeInputs := make(map[string]string)
+	for _, ni := range req.NodeInputs {
+		if ni.NodeName != "" {
+			nodeInputs[ni.NodeName] = ni.Input
+		}
+	}
+	exec, err := s.svc.Run(ctx, &service.RunFlowReq{FlowID: req.FlowId, NodeInputs: nodeInputs})
 	if err != nil {
 		return nil, err
 	}

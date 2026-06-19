@@ -237,7 +237,7 @@ func (t *taskDispatcher) MasterCall() {
 		}
 	}
 
-	logger.Info("[MasterCall] executing, isLeader=%v, isReady=%v", t.Cluster.IsLeader(), t.Cluster.IsReady())
+	logger.Debug("[MasterCall] executing, isLeader=%v, isReady=%v", t.Cluster.IsLeader(), t.Cluster.IsReady())
 
 	t.runningL.Store(true)
 	t.lastMasterCallTime.Store(time.Now())

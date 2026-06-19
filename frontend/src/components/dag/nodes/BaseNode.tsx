@@ -12,6 +12,7 @@ export interface BaseNodeData extends Record<string, unknown> {
   config?: Record<string, unknown>;
   state?: string;
   icon?: string;
+  selected?: boolean;
   children?: ReactNode;
 }
 
@@ -28,14 +29,19 @@ interface BaseNodeProps {
 function BaseNode({ data, accentColor, icon, extra }: BaseNodeProps) {
   const state = data.state || 'pending';
   const stateColor = getNodeStateColor(state);
+  const isSelected = data.selected === true;
 
   return (
     <div
-      className="relative min-w-[150px] rounded-lg shadow-md overflow-hidden"
+      className="relative min-w-[150px] rounded-lg shadow-md overflow-hidden transition-all cursor-pointer"
       style={{
         background: stateColor.bg,
-        border: `2px solid ${stateColor.border}`,
-        boxShadow: stateColor.glow !== 'none' ? stateColor.glow : undefined,
+        border: `2px solid ${isSelected ? '#60a5fa' : stateColor.border}`,
+        boxShadow: isSelected
+          ? '0 0 0 2px rgba(96, 165, 250, 0.4), 0 4px 12px rgba(0,0,0,0.3)'
+          : stateColor.glow !== 'none'
+            ? stateColor.glow
+            : undefined,
       }}
     >
       {/* 入边 Handle */}

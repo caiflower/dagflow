@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Flow, FlowNode, FlowEdge, Protocol, Execution, PageResult } from '../types';
+import type { Flow, FlowNode, FlowEdge, Protocol, Execution, NodeInput, PageResult } from '../types';
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -65,8 +65,11 @@ export const protocolApi = {
 
 // Execution API
 export const executionApi = {
-  run: (flowId: number) =>
-    api.post('/executions/run', { flowId }).then(r => unwrap<{ execution: Execution }>(r).execution),
+  run: (flowId: number, nodeInputs?: NodeInput[]) =>
+    api.post('/executions/run', {
+      flowID: flowId,
+      nodeInputs: nodeInputs || [],
+    }).then(r => unwrap<{ execution: Execution }>(r).execution),
   get: (id: string) =>
     api.get(`/executions/${id}`).then(r => unwrap<{ execution: Execution }>(r).execution),
   list: () =>

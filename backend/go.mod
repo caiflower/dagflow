@@ -6,7 +6,7 @@ toolchain go1.24.1
 
 require (
 	github.com/alicebob/miniredis/v2 v2.38.0
-	github.com/caiflower/common-tools v0.0.0-20260619124224-7b2b12c023a8
+	github.com/caiflower/common-tools v0.0.0-20260619161739-0cc1e2a589ab
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/redis/go-redis/v9 v9.20.1
 	github.com/stretchr/testify v1.11.1

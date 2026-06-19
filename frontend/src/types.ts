@@ -48,11 +48,16 @@ export interface ConfigField {
   options?: string[];
 }
 
+export interface NodeInput {
+  nodeName: string;
+  input: string;
+}
+
 export interface Execution {
   id: string;
   flowID: number;
   flowName: string;
-  state: 'pending' | 'running' | 'succeeded' | 'failed';
+  state: 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
   startTime: string;
   endTime: string;
   nodes: NodeStatus[];

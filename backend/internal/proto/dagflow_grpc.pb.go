@@ -277,7 +277,7 @@ var FlowService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "dagflow.proto",
+	Metadata: "internal/proto/dagflow.proto",
 }
 
 // ProtocolServiceClient is the client API for ProtocolService service.
@@ -399,7 +399,7 @@ var ProtocolService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "dagflow.proto",
+	Metadata: "internal/proto/dagflow.proto",
 }
 
 // ExecutionServiceClient is the client API for ExecutionService service.
@@ -557,5 +557,5 @@ var ExecutionService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "dagflow.proto",
+	Metadata: "internal/proto/dagflow.proto",
 }

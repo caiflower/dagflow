@@ -3,6 +3,14 @@
 logger:
   level: INFO
 
+cluster:
+  mode: cluster
+  nodes:
+    - name: dagflow-node
+      ip: 127.0.0.1
+      port: 9090
+      local: true
+
 web:
   - name: dagflow
     addr: "0.0.0.0:8080"

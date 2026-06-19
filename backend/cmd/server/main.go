@@ -19,7 +19,9 @@ package main
 import (
 	"context"
 	"runtime"
+	"time"
 
+	"github.com/caiflower/common-tools/cluster"
 	dbv1 "github.com/caiflower/common-tools/db/v1"
 	"github.com/caiflower/common-tools/global"
 	"github.com/caiflower/common-tools/pkg/bean"
@@ -33,13 +35,20 @@ import (
 	"github.com/caiflower/dagflow/internal/model/dao"
 	"github.com/caiflower/dagflow/internal/protocol"
 	"github.com/caiflower/dagflow/internal/service"
+	"github.com/caiflower/dagflow/taskx"
 	taskxModel "github.com/caiflower/dagflow/taskx/dao/model"
 )
 
 var engine *web.Engine
 
+// dbClient 全局数据库客户端引用
+var dbClient *dbv1.Client
+
 // protocolRegistry 全局协议注册中心
 var protocolRegistry *protocol.Registry
+
+// dagflowCluster 单节点集群引用
+var dagflowCluster cluster.ICluster
 
 func init() {
 	// 1. 加载配置
@@ -59,13 +68,19 @@ func init() {
 	// 5. 初始化数据库
 	initDB()
 
-	// 6. 注入所有 autowired 依赖
+	// 6. 初始化 taskx 集群调度（注册 cluster + DAO beans）
+	initTaskx()
+
+	// 7. 注入所有 autowired 依赖
 	bean.Ioc()
 
-	// 7. Ioc 完成后，创建 gRPC 服务实例并设置到 API 层
+	// 8. Ioc 完成后，启动 taskx receiver 和 cluster
+	startTaskx()
+
+	// 9. 创建 gRPC 服务实例并设置到 API 层
 	initGrpcServices()
 
-	// 8. 初始化 Web 引擎（路由注册在 gRPC 服务就绪后执行）
+	// 10. 初始化 Web 引擎（路由注册在 gRPC 服务就绪后执行）
 	initWeb()
 }
 
@@ -130,6 +145,7 @@ func initDB() {
 	if err != nil {
 		panic("failed to init database: " + err.Error())
 	}
+	dbClient = client
 
 	// 注册 DB client 为 bean（FlowDAO 通过 autowired 注入）
 	bean.SetBeanOverwrite(dbCfg.Name, client)
@@ -160,4 +176,57 @@ func initDB() {
 	dao.Init()
 
 	logger.Info("database initialized successfully")
+}
+
+// initTaskx 初始化 taskx 集群调度基础设施
+// 在 bean.Ioc() 之前调用，注册 cluster 和 taskx DAO beans
+func initTaskx() {
+	// 从 default.yaml 读取集群配置
+	clusterCfg := constants.DefaultConfig.ClusterConfig
+
+	c, err := cluster.NewClusterWithArgs(clusterCfg, logger.NewLogger(&logger.Config{}))
+	if err != nil {
+		panic("failed to create cluster: " + err.Error())
+	}
+	// 注册 cluster 为 bean，供 taskx dispatcher/receiver autowired 注入
+	dagflowCluster = c
+	bean.AddBean(c)
+
+	// 初始化 taskx dispatcher（使用已有 DB client）
+	taskx.InitTaskDispatcherWithDB(&taskx.Config{
+		SubtaskWorker:            50,
+		SubtaskQueueSize:         200,
+		SubtaskRollbackWorker:    10,
+		SubtaskRollbackQueueSize: 100,
+		TaskWorker:               5,
+		TaskQueueSize:            100,
+		RemoteCallTimeout:        3 * time.Second,
+	}, dbClient)
+}
+
+// startTaskx 启动 taskx receiver 和 cluster（在 bean.Ioc() 之后调用）
+func startTaskx() {
+	if err := taskx.StartReceiver(); err != nil {
+		panic("failed to start taskx receiver: " + err.Error())
+	}
+
+	tracker := cluster.NewDefaultJobTracker(5, taskx.SingletonTaskDispatcher)
+	if err := dagflowCluster.AddJobTracker(tracker); err != nil {
+		panic("failed to add job tracker: " + err.Error())
+	}
+	if err := dagflowCluster.Start(); err != nil {
+		panic("failed to start cluster: " + err.Error())
+	}
+
+	// 等待集群就绪
+	go func() {
+		for i := 0; i < 30; i++ {
+			if dagflowCluster.IsReady() {
+				logger.Info("taskx cluster ready")
+				return
+			}
+			time.Sleep(time.Second)
+		}
+		logger.Warn("taskx cluster not ready after 30s")
+	}()
 }

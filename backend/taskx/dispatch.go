@@ -108,7 +108,7 @@ const masterCallMinInterval = 5 * time.Second
 
 func InitTaskDispatcher(cfg *Config) {
 	initOnce.Do(func() {
-		_ = tools.DoTagFunc(&cfg, []tools.FnObj{{Fn: tools.SetDefaultValueIfNil}})
+		_ = tools.DoTagFunc(cfg, []tools.FnObj{{Fn: tools.SetDefaultValueIfNil}})
 
 		// Validate StorageBackend
 		switch cfg.StorageBackend {
@@ -166,6 +166,57 @@ func InitTaskDispatcher(cfg *Config) {
 		bean.AddBean(SingletonTaskDispatcher)
 		bean.AddBean(_tr)
 	})
+}
+
+// InitTaskDispatcherWithDB 初始化 taskx dispatcher，使用已有的 DB client。
+// 适用于主应用已经创建了 DB client 的场景。
+func InitTaskDispatcherWithDB(cfg *Config, client *dbv1.Client) {
+	initOnce.Do(func() {
+		_ = tools.DoTagFunc(cfg, []tools.FnObj{{Fn: tools.SetDefaultValueIfNil}})
+
+		_tr.subtaskWorker = cfg.SubtaskWorker
+		_tr.taskWorker = cfg.TaskWorker
+		_tr.subtaskRollbackWorker = cfg.SubtaskRollbackWorker
+		_tr.subtaskQueueSize = cfg.SubtaskQueueSize
+		_tr.taskQueueSize = cfg.TaskQueueSize
+		_tr.subtaskRollbackQueueSize = cfg.SubtaskRollbackQueueSize
+		_tr.cfg = cfg
+		_tr.subtaskInflight = inflight.NewInFlight()
+		_tr.taskInflight = inflight.NewInFlight()
+		SingletonTaskDispatcher.cfg = cfg
+		SingletonTaskDispatcher.DBClient = client
+		SingletonTaskDispatcher.delayQueue = basic.NewDelayQueue()
+		SingletonTaskDispatcher.randSource = rand.New(rand.NewSource(time.Now().UnixNano()))
+		SingletonTaskDispatcher.allocateWorkerInflight = inflight.NewInFlight()
+		SingletonTaskDispatcher.taskCache = gocache.New(30*time.Second, 60*time.Second)
+
+		tables := cfg.Tables
+		if tables == nil {
+			tables = sqld.DefaultTableConfig()
+		} else {
+			tables = tables.Normalize()
+			cfg.Tables = tables
+		}
+		bean.AddBean(sqld.NewTaskDAOWithConfig(client, tables.Task))
+		bean.AddBean(sqld.NewTaskBakDAOWithConfig(client, tables.TaskBak))
+		bean.AddBean(sqld.NewSubtaskDAOWithConfig(client, tables.Subtask))
+		bean.AddBean(sqld.NewSubtaskBakDAOWithConfig(client, tables.SubtaskBak))
+		bean.AddBean(sqld.NewTaskEdgeDAOWithConfig(client, tables.TaskEdge))
+
+		bean.AddBean(SingletonTaskDispatcher)
+		bean.AddBean(_tr)
+	})
+}
+
+// StartReceiver 启动 taskx receiver 的 worker pool。
+// 必须在 bean.Ioc() 完成之后调用（确保 Cluster/DAO 已注入）。
+func StartReceiver() error {
+	return _tr.Start()
+}
+
+// StopReceiver 停止 taskx receiver。
+func StopReceiver() {
+	_tr.Close()
 }
 
 func (t *taskDispatcher) MasterCall() {

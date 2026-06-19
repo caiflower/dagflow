@@ -92,7 +92,11 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
   pollExecution: async (id: string) => {
     const poll = async () => {
       const exec = await executionApi.get(id);
-      set({ currentExec: exec });
+      set((s) => ({
+        currentExec: exec,
+        // 同步更新列表中的对应记录
+        executions: s.executions.map((e) => (e.id === id ? exec : e)),
+      }));
       if (exec.state === 'running' || exec.state === 'pending') {
         setTimeout(poll, 2000);
       }

@@ -404,10 +404,10 @@ func TestMCPExecutor_EmptyInput(t *testing.T) {
 // ===== ExecutorProtocol 测试 =====
 
 func TestExecutorProtocol_Values(t *testing.T) {
-	assert.Equal(t, ExecutorProtocol("local"), ProtocolLocal)
-	assert.Equal(t, ExecutorProtocol("grpc"), ProtocolGRPC)
-	assert.Equal(t, ExecutorProtocol("http"), ProtocolHTTP)
-	assert.Equal(t, ExecutorProtocol("mcp"), ProtocolMCP)
+	assert.Equal(t, Protocol("local"), ProtocolLocal)
+	assert.Equal(t, Protocol("grpc"), ProtocolGRPC)
+	assert.Equal(t, Protocol("http"), ProtocolHTTP)
+	assert.Equal(t, Protocol("mcp"), ProtocolMCP)
 }
 
 // ===== TaskData 测试 =====
@@ -530,8 +530,8 @@ func (e *customExecutor) Execute(ctx context.Context, data *TaskData) (any, erro
 	return simpleOutput{Result: input.Value + len(e.customValue)}, nil
 }
 
-func (e *customExecutor) Protocol() ExecutorProtocol {
-	return ExecutorProtocol("custom")
+func (e *customExecutor) Protocol() Protocol {
+	return Protocol("custom")
 }
 
 func TestCustomExecutor(t *testing.T) {
@@ -546,7 +546,7 @@ func TestCustomExecutor(t *testing.T) {
 	output, ok := result.(simpleOutput)
 	assert.True(t, ok)
 	assert.Equal(t, 15, output.Result) // 10 + len("hello")
-	assert.Equal(t, ExecutorProtocol("custom"), exec.Protocol())
+	assert.Equal(t, Protocol("custom"), exec.Protocol())
 }
 
 // ===== Functional Options 测试 =====

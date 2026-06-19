@@ -128,7 +128,7 @@ func (e *GRPCExecutor[I, O]) Execute(ctx context.Context, data *TaskData) (any, 
 }
 
 // Protocol 返回协议类型
-func (e *GRPCExecutor[I, O]) Protocol() ExecutorProtocol { return ProtocolGRPC }
+func (e *GRPCExecutor[I, O]) Protocol() Protocol { return ProtocolGRPC }
 
 // Close 关闭 gRPC 连接
 func (e *GRPCExecutor[I, O]) Close() error {

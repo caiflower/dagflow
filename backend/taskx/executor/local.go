@@ -33,7 +33,7 @@ func (e *LocalExecutor[I, O]) Execute(ctx context.Context, data *TaskData) (any,
 }
 
 // Protocol 返回协议类型
-func (e *LocalExecutor[I, O]) Protocol() ExecutorProtocol { return ProtocolLocal }
+func (e *LocalExecutor[I, O]) Protocol() Protocol { return ProtocolLocal }
 
 // InputType 返回输入类型（实现 TypedProvider 接口）
 func (e *LocalExecutor[I, O]) InputType() reflect.Type {

@@ -1,0 +1,190 @@
+syntax = "proto3";
+
+package dagflow;
+
+option go_package = "github.com/caiflower/dagflow/internal/proto";
+
+// ==================== Flow Service ====================
+
+service FlowService {
+  rpc Create(CreateFlowRequest) returns (FlowResponse);
+  rpc Get(GetFlowRequest) returns (FlowResponse);
+  rpc List(ListFlowRequest) returns (ListFlowResponse);
+  rpc Update(UpdateFlowRequest) returns (FlowResponse);
+  rpc Delete(DeleteFlowRequest) returns (DeleteFlowResponse);
+  rpc Validate(ValidateFlowRequest) returns (ValidateFlowResponse);
+}
+
+message FlowNode {
+  string id = 1;
+  string name = 2;
+  string type = 3;        // task, branch, start, end
+  string protocol = 4;    // http, grpc, local, mcp
+  string config_json = 5; // JSON encoded config
+  double position_x = 6;
+  double position_y = 7;
+}
+
+message FlowEdge {
+  string id = 1;
+  string source = 2;
+  string target = 3;
+  string type = 4;  // control, data, control+data
+  string expr = 5;  // condition expression
+}
+
+message Flow {
+  int64 id = 1;
+  string name = 2;
+  string description = 3;
+  string nodes_json = 4;
+  string edges_json = 5;
+  int32 version = 6;
+  int32 status = 7;
+  string create_time = 8;
+  string update_time = 9;
+}
+
+message CreateFlowRequest {
+  string name = 1;
+  string description = 2;
+  repeated FlowNode nodes = 3;
+  repeated FlowEdge edges = 4;
+}
+
+message GetFlowRequest {
+  // @gotags: path:"id"
+  int64 id = 1;
+}
+
+message ListFlowRequest {
+  // @gotags: query:"page"
+  int32 page = 1;
+  // @gotags: query:"pageSize"
+  int32 page_size = 2;
+  // @gotags: query:"name"
+  string name = 3;
+}
+
+message ListFlowResponse {
+  repeated Flow items = 1;
+  int32 total = 2;
+}
+
+message UpdateFlowRequest {
+  // @gotags: path:"id"
+  int64 id = 1;
+  string name = 2;
+  string description = 3;
+  repeated FlowNode nodes = 4;
+  repeated FlowEdge edges = 5;
+}
+
+message DeleteFlowRequest {
+  // @gotags: path:"id"
+  int64 id = 1;
+}
+
+message DeleteFlowResponse {
+  string status = 1;
+}
+
+message FlowResponse {
+  Flow flow = 1;
+}
+
+message ValidateFlowRequest {
+  repeated FlowNode nodes = 1;
+  repeated FlowEdge edges = 2;
+}
+
+message ValidateFlowResponse {
+  bool valid = 1;
+  string error = 2;
+}
+
+// ==================== Protocol Service ====================
+
+service ProtocolService {
+  rpc List(ListProtocolRequest) returns (ListProtocolResponse);
+  rpc Get(GetProtocolRequest) returns (ProtocolResponse);
+}
+
+message ConfigField {
+  string name = 1;
+  string label = 2;
+  string type = 3;
+  bool required = 4;
+  string default_value = 5;
+  string description = 6;
+  repeated string options = 7;
+}
+
+message ConfigSchema {
+  repeated ConfigField fields = 1;
+}
+
+message ProtocolInfo {
+  string name = 1;
+  string display_name = 2;
+  string description = 3;
+  ConfigSchema config_schema = 4;
+}
+
+message ListProtocolRequest {}
+
+message ListProtocolResponse {
+  repeated ProtocolInfo items = 1;
+}
+
+message GetProtocolRequest {
+  // @gotags: path:"name"
+  string name = 1;
+}
+
+message ProtocolResponse {
+  ProtocolInfo protocol = 1;
+}
+
+// ==================== Execution Service ====================
+
+service ExecutionService {
+  rpc Run(RunFlowRequest) returns (ExecutionResponse);
+  rpc Get(GetExecutionRequest) returns (ExecutionResponse);
+  rpc List(ListExecutionRequest) returns (ListExecutionResponse);
+}
+
+message NodeStatus {
+  string id = 1;
+  string name = 2;
+  string state = 3;
+}
+
+message Execution {
+  string id = 1;
+  int64 flow_id = 2;
+  string flow_name = 3;
+  string state = 4;
+  string start_time = 5;
+  string end_time = 6;
+  repeated NodeStatus nodes = 7;
+}
+
+message RunFlowRequest {
+  int64 flow_id = 1;
+}
+
+message GetExecutionRequest {
+  // @gotags: path:"id"
+  string id = 1;
+}
+
+message ListExecutionRequest {}
+
+message ExecutionResponse {
+  Execution execution = 1;
+}
+
+message ListExecutionResponse {
+  repeated Execution items = 1;
+}

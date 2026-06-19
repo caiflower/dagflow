@@ -130,4 +130,4 @@ func (e *HTTPExecutor[I, O]) Execute(ctx context.Context, data *TaskData) (any, 
 }
 
 // Protocol 返回协议类型
-func (e *HTTPExecutor[I, O]) Protocol() ExecutorProtocol { return ProtocolHTTP }
+func (e *HTTPExecutor[I, O]) Protocol() Protocol { return ProtocolHTTP }

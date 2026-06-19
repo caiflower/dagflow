@@ -1,0 +1,117 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+context: |
+  Module: hidream.com/application-service/algo-metrics
+  Tech stack: Go 1.24
+  Framework: github.com/caiflower/common-tools
+  Database: MySQL (using bun ORM via github.com/uptrace/bun)
+  Start: go run main.go -config ./etc
+
+  ## Project Layout
+
+  ## Architecture Patterns
+
+  ### Startup Order (main.go init())
+  1. constants.InitConfig()        — load etc/config.yaml + etc/default.yaml
+  2. logger.InitLogger()           — init logger, add to resource manager
+  3. initBean()                    — register any manual beans
+  4. web.Init()                    — create HTTP engine, register routes, add as daemon
+  5. dao.Init()                    — (optional) init DB client, add bean
+  6. caller.Init()                 — init cluster, add daemon
+  7. bean.Ioc()                    — inject all autowired dependencies
+  Then main() calls global.DefaultResourceManger.Signal() for graceful shutdown.
+
+  ### Resource Management
+  - Use global.DefaultResourceManger for lifecycle management
+  - Daemon services: implement global.DaemonResource (Name(), Start() error, Close())
+  - Register via global.DefaultResourceManger.AddDaemon(&Service{})
+  - Non-daemon resources: global.DefaultResourceManger.Add(resource)
+  - Signal() in main() handles graceful shutdown
+
+  ## common-tools Framework Documentation
+
+  This project uses `github.com/caiflower/common-tools` as the core framework.
+  The framework maintains up-to-date documentation in the Go module cache.
+  **When implementing features that involve common-tools components, you MUST read the corresponding docs first** to get the latest API usage and constraints.
+
+  ### How to Find common-tools Docs
+
+  The common-tools source is located in the Go module cache. Use this shell command to locate it:
+  ```bash
+  ls "$(go env GOMODCACHE)/github.com/caiflower/common-tools@$(grep 'common-tools' go.mod | awk '{print $2}')/"
+  ```
+
+  Key documentation files (relative to the common-tools root above):
+  - `README.md` — Component overview and quick start
+  - `docs/bean.md` — Dependency Injection (IOC): autowired tags, bean registration, bean.Ioc()
+  - `docs/web.md` — Web framework: HTTP server, routing, middleware, parameter binding, HTTP client, gRPC integration
+  - `docs/cluster/cluster.md` — Cluster management: leader election, heartbeat, remote calls, job tracker
+  - `docs/cluster/redis-node-discovery.md` — Redis-based node discovery for cluster
+  - `docs/taskx/README.md` — Task scheduling framework: DAG tasks, sub-task result passing
+
+  ### Framework Usage Principles
+
+  - **Always use common-tools provided clients** for infrastructure (Redis, DB, ClickHouse, Kafka, HTTP Client, JSON).
+    Do NOT use third-party or standard library equivalents directly (e.g. no `github.com/go-redis/redis`, no `encoding/json`, no `net/http.Client`).
+    For specific API signatures and initialization patterns, read the corresponding doc file listed above. See `README.md` for component overview.
+  - **Client lifecycle is managed by common-tools** via `global.DefaultResourceManger`; do NOT manually close infrastructure clients. See `README.md` for global resource management.
+  - **Configuration for infrastructure clients** comes from `constants.DefaultConfig` (loaded from etc/default.yaml). See `README.md` for config sections.
+  - **Dependency Injection**: Use `autowired:""` struct tags, `bean.AddBean()`, and call `bean.Ioc()` once after all beans are registered. See `docs/bean.md` for details.
+  - **Web routing**: All routes go in `web/restful.go`. See `docs/web.md` for route registration API.
+  - **Cluster/Leader Election**: See `docs/cluster/cluster.md` for initialization, job tracker, and caller interface.
+  - **JSON**: Use `github.com/caiflower/common-tools/pkg/json` instead of `encoding/json`. See `README.md` tools section.
+  - **Context Keys**: Use new-api's `common.SetContextKey/GetContextKeyString` with `constant.ContextKeyXxx`; do NOT invent custom context keys for data already covered by these constants.
+  - **Middleware order**: Identity → ExtractModel → RateLimit → (future: Quota) → Handler
+
+  ## Project-Specific Conventions
+
+  ### Configuration
+  - etc/default.yaml  → constants.DefaultConfig (type config.DefaultConfig)
+    - Sections: web, cluster, database, redis, kafka, logger
+    - Load via config.LoadDefaultConfig(&DefaultConfig)
+  - etc/config.yaml   → constants.Prop (type constants.Config)
+    - Business fields: go_max_procs, caller_interval, and any new domain fields
+    - Load via config.LoadYamlFile("config.yaml", &Prop)
+  - ALL new config structs and fields go into constants/config.go
+
+  ### Code Organization Rules
+  - Keep related functionality in the same file; avoid scattering config across multiple files
+  - ALL config structs → constants/config.go (never create separate config files per feature)
+  - ALL route definitions → web/restful.go (never register routes inside controllers)
+  - New domain controllers → controller/v1/<domain>/<domain>.go
+  - New domain models → model/api/<domain>/<domain>.go
+  - New domain services → service/<domain>/<domain>.go
+  - Before creating a new file, check if an existing file in that package can be extended
+  - Only create a new package directory when introducing a fully separate domain or module
+
+  ### Controller Layer
+  - One struct per controller, named <Domain>Controller (e.g. HelloWorldController)
+  - No embedded base struct; receive concrete request types, return response or e.ApiError
+  - Method signatures (choose one pattern):
+    - func (c *FooController) Action() ReturnType
+    - func (c *FooController) Action(req *model.FooReq) (*model.FooRes, e.ApiError)
+  - Use e.NewApiError(e.InvalidArgument, "msg", err) to return errors
+  - Do NOT define routes inside controllers; all routing lives in web/restful.go
+
+  ### Model Layer
+  - model/api/base.go: shared Request struct (embed for X-Request-Id header injection)
+    type Request struct { RequestId string `header:"X-Request-Id" json:"-"` }
+  - model/api/<domain>/: domain request/response structs + generated gRPC pb.go files
+  - Struct binding tags: `json:"field"`, `header:"Header-Name"`, `path:"param"`, `query:"param"`, `verf:"required"`
+  - Request structs that need X-Request-Id should embed api.Request
+
+  ### gRPC / IDL
+  - Define protobuf in model/idl/<domain>.proto
+  - model/idl/generate.go holds go:generate directives for protoc
+  - Generated files go to model/api/<domain>/  (*.pb.go, *_grpc.pb.go)
+  - Controller implements Unimplemented<Service>Server from the generated package
+  - Run `go generate ./...` to regenerate all IDL and DAO code
+
+  ### DAO Layer
+  - dao/client.go: Init() creates DB client; DAO structs are generated via go:generate
+  - Register DB client as bean: bean.AddBean(db)
+  - Inject into services/controllers with `autowired:""`
+  - Call dao.Init() in main.go init() before bean.Ioc()

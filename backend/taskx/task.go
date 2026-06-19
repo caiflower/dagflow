@@ -521,7 +521,7 @@ func (p *nameResolvingProvider) Execute(ctx context.Context, data *executor.Task
 	return result, nil
 }
 
-func (p *nameResolvingProvider) Protocol() executor.ExecutorProtocol {
+func (p *nameResolvingProvider) Protocol() executor.Protocol {
 	return p.inner.Protocol()
 }
 

@@ -11,17 +11,17 @@ type ExecutorProvider interface {
 	// Execute 执行子任务
 	Execute(ctx context.Context, data *TaskData) (any, error)
 	// Protocol 返回协议类型
-	Protocol() ExecutorProtocol
+	Protocol() Protocol
 }
 
 // ExecutorProtocol 执行器协议类型
-type ExecutorProtocol string
+type Protocol string
 
 const (
-	ProtocolLocal ExecutorProtocol = "local" // 本地函数
-	ProtocolGRPC  ExecutorProtocol = "grpc"  // gRPC 远程调用
-	ProtocolHTTP  ExecutorProtocol = "http"  // HTTP REST 调用
-	ProtocolMCP   ExecutorProtocol = "mcp"   // MCP 工具调用
+	ProtocolLocal Protocol = "local" // 本地函数
+	ProtocolGRPC  Protocol = "grpc"  // gRPC 远程调用
+	ProtocolHTTP  Protocol = "http"  // HTTP REST 调用
+	ProtocolMCP   Protocol = "mcp"   // MCP 工具调用
 )
 
 // TaskData 任务执行时的数据传递结构

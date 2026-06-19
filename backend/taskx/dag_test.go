@@ -1294,7 +1294,7 @@ func (e *nonTypedExec) Execute(ctx context.Context, data *executor.TaskData) (an
 	return nil, nil
 }
 
-func (e *nonTypedExec) Protocol() executor.ExecutorProtocol {
+func (e *nonTypedExec) Protocol() executor.Protocol {
 	return "non-typed"
 }
 

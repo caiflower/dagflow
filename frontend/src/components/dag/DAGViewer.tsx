@@ -1,0 +1,148 @@
+/**
+ * DAGViewer — 封装 ReactFlow 容器
+ *
+ * 支持两种模式：
+ *  - editor: 可编辑（拖拽、连线、删除）
+ *  - preview: 只读（查看 + 状态展示）
+ */
+import { useCallback, useMemo } from 'react';
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  Panel,
+  useNodesState,
+  useEdgesState,
+  type Connection,
+  type Node,
+  type Edge,
+  type OnNodesChange,
+  type OnEdgesChange,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import { nodeTypes } from './nodes';
+import { edgeTypes } from './edges';
+import { getNodeTypeColor } from '../../utils/stateColor';
+
+interface DAGViewerProps {
+  /** 初始节点 */
+  nodes: Node[];
+  /** 初始边 */
+  edges: Edge[];
+  /** 模式：editor 可编辑 | preview 只读 */
+  mode?: 'editor' | 'preview';
+  /** 节点变更回调 */
+  onNodesChange?: OnNodesChange;
+  /** 边变更回调 */
+  onEdgesChange?: OnEdgesChange;
+  /** 连线回调 */
+  onConnect?: (params: Connection) => void;
+  /** 节点状态映射（用于 MiniMap 着色） */
+  nodeStates?: Record<string, string>;
+}
+
+export default function DAGViewer({
+  nodes: initNodes,
+  edges: initEdges,
+  mode = 'editor',
+  onNodesChange: externalOnNodesChange,
+  onEdgesChange: externalOnEdgesChange,
+  onConnect: externalOnConnect,
+}: DAGViewerProps) {
+  const isReadOnly = mode === 'preview';
+
+  const [nodes, , onNodesChangeInternal] = useNodesState(initNodes);
+  const [edges, , onEdgesChangeInternal] = useEdgesState(initEdges);
+
+  // 使用内部或外部回调
+  const handleNodesChange: OnNodesChange = useCallback(
+    (changes) => {
+      onNodesChangeInternal(changes);
+      externalOnNodesChange?.(changes);
+    },
+    [onNodesChangeInternal, externalOnNodesChange],
+  );
+
+  const handleEdgesChange: OnEdgesChange = useCallback(
+    (changes) => {
+      onEdgesChangeInternal(changes);
+      externalOnEdgesChange?.(changes);
+    },
+    [onEdgesChangeInternal, externalOnEdgesChange],
+  );
+
+  const handleConnect = useCallback(
+    (params: Connection) => {
+      if (isReadOnly) return;
+      if (externalOnConnect) {
+        externalOnConnect(params);
+      }
+    },
+    [isReadOnly, externalOnConnect],
+  );
+
+  // MiniMap 节点着色
+  const miniMapNodeColor = useMemo(
+    () => (n: Node) => {
+      const data = n.data as { nodeType?: string } | undefined;
+      const type = data?.nodeType || 'task';
+      return getNodeTypeColor(type).border;
+    },
+    [],
+  );
+
+  return (
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
+      onNodesChange={isReadOnly ? undefined : handleNodesChange}
+      onEdgesChange={isReadOnly ? undefined : handleEdgesChange}
+      onConnect={handleConnect}
+      nodesDraggable={!isReadOnly}
+      nodesConnectable={!isReadOnly}
+      elementsSelectable={!isReadOnly}
+      fitView
+      fitViewOptions={{ padding: 0.2 }}
+      className="bg-gray-900"
+    >
+      <Background color="#374151" gap={16} size={1} />
+      <Controls className="!bg-gray-800 !border-gray-700 !rounded-lg [&>button]:!bg-gray-800 [&>button]:!border-gray-700 [&>button]:!text-gray-300 [&>button:hover]:!bg-gray-700" />
+      <MiniMap
+        nodeColor={miniMapNodeColor}
+        className="!bg-gray-800 !border-gray-700 !rounded-lg"
+        maskColor="rgba(0,0,0,0.5)"
+      />
+
+      {/* 图例 */}
+      <Panel position="top-right">
+        <div className="bg-gray-800/90 backdrop-blur-sm border border-gray-700 rounded-lg p-3 text-xs space-y-1.5">
+          <div className="text-gray-400 font-medium mb-1">节点类型</div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded" style={{ background: getNodeTypeColor('start').border }} />
+            <span className="text-gray-300">开始</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded" style={{ background: getNodeTypeColor('task').border }} />
+            <span className="text-gray-300">任务</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded" style={{ background: getNodeTypeColor('branch').border }} />
+            <span className="text-gray-300">分支</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded" style={{ background: getNodeTypeColor('end').border }} />
+            <span className="text-gray-300">结束</span>
+          </div>
+          {mode === 'editor' && (
+            <div className="text-gray-500 mt-2 pt-2 border-t border-gray-700">
+              拖拽移动 · 连线创建
+            </div>
+          )}
+        </div>
+      </Panel>
+    </ReactFlow>
+  );
+}

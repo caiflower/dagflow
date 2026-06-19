@@ -164,4 +164,4 @@ func (e *MCPExecutor) Execute(ctx context.Context, data *TaskData) (any, error) 
 }
 
 // Protocol 返回协议类型
-func (e *MCPExecutor) Protocol() ExecutorProtocol { return ProtocolMCP }
+func (e *MCPExecutor) Protocol() Protocol { return ProtocolMCP }

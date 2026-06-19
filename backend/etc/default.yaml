@@ -1,0 +1,20 @@
+# DAGFlow 基础设施配置
+
+logger:
+  level: INFO
+
+web:
+  - name: dagflow
+    addr: "0.0.0.0:8080"
+    enable_pprof: true
+    enable_metrics: false
+
+database:
+  - name: dagflow
+    dialect: sqlite
+    url: "./dagflow.db"
+    dbName: dagflow
+    charset: utf8mb4
+    maxOpen: 50
+    maxIdle: 10
+    debug: true

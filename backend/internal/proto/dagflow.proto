@@ -20,8 +20,11 @@ message FlowNode {
   string name = 2;
   string type = 3;        // task, branch, start, end
   string protocol = 4;    // http, grpc, local, mcp
+  // @gotags: json:"configJSON"
   string config_json = 5; // JSON encoded config
+  // @gotags: json:"positionX"
   double position_x = 6;
+  // @gotags: json:"positionY"
   double position_y = 7;
 }
 
@@ -37,11 +40,15 @@ message Flow {
   int64 id = 1;
   string name = 2;
   string description = 3;
+  // @gotags: json:"nodesJSON"
   string nodes_json = 4;
+  // @gotags: json:"edgesJSON"
   string edges_json = 5;
   int32 version = 6;
   int32 status = 7;
+  // @gotags: json:"createTime"
   string create_time = 8;
+  // @gotags: json:"updateTime"
   string update_time = 9;
 }
 
@@ -115,6 +122,7 @@ message ConfigField {
   string label = 2;
   string type = 3;
   bool required = 4;
+  // @gotags: json:"defaultValue"
   string default_value = 5;
   string description = 6;
   repeated string options = 7;
@@ -126,8 +134,10 @@ message ConfigSchema {
 
 message ProtocolInfo {
   string name = 1;
+  // @gotags: json:"displayName"
   string display_name = 2;
   string description = 3;
+  // @gotags: json:"configSchema"
   ConfigSchema config_schema = 4;
 }
 
@@ -162,15 +172,20 @@ message NodeStatus {
 
 message Execution {
   string id = 1;
+  // @gotags: json:"flowID"
   int64 flow_id = 2;
+  // @gotags: json:"flowName"
   string flow_name = 3;
   string state = 4;
+  // @gotags: json:"startTime"
   string start_time = 5;
+  // @gotags: json:"endTime"
   string end_time = 6;
   repeated NodeStatus nodes = 7;
 }
 
 message RunFlowRequest {
+  // @gotags: json:"flowID"
   int64 flow_id = 1;
 }
 

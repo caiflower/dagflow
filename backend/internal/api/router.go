@@ -24,7 +24,7 @@ import (
 	pb "github.com/caiflower/dagflow/internal/proto"
 )
 
-// RegisterRoutes 注册所有 API 路由（gRPC handler + RESTful 路径）
+// RegisterRoutes 注册所有 API 路由（统一 gRPC handler 方式）
 func RegisterRoutes(engine *web.Engine) {
 	engine.Use(corsMiddleware)
 	engine.Use(requestLogMiddleware)

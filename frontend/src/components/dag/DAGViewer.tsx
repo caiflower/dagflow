@@ -1,5 +1,5 @@
 /**
- * DAGViewer — 封装 ReactFlow 容器
+ * DAGViewer — 封装 ReactFlow 容器（受控模式）
  *
  * 支持两种模式：
  *  - editor: 可编辑（拖拽、连线、删除）
@@ -12,8 +12,6 @@ import {
   Controls,
   MiniMap,
   Panel,
-  useNodesState,
-  useEdgesState,
   type Connection,
   type Node,
   type Edge,
@@ -26,63 +24,33 @@ import { edgeTypes } from './edges';
 import { getNodeTypeColor } from '../../utils/stateColor';
 
 interface DAGViewerProps {
-  /** 初始节点 */
   nodes: Node[];
-  /** 初始边 */
   edges: Edge[];
-  /** 模式：editor 可编辑 | preview 只读 */
   mode?: 'editor' | 'preview';
-  /** 节点变更回调 */
-  onNodesChange?: OnNodesChange;
-  /** 边变更回调 */
-  onEdgesChange?: OnEdgesChange;
-  /** 连线回调 */
+  onNodesChange: OnNodesChange;
+  onEdgesChange: OnEdgesChange;
   onConnect?: (params: Connection) => void;
-  /** 节点状态映射（用于 MiniMap 着色） */
   nodeStates?: Record<string, string>;
 }
 
 export default function DAGViewer({
-  nodes: initNodes,
-  edges: initEdges,
+  nodes,
+  edges,
   mode = 'editor',
-  onNodesChange: externalOnNodesChange,
-  onEdgesChange: externalOnEdgesChange,
+  onNodesChange,
+  onEdgesChange,
   onConnect: externalOnConnect,
 }: DAGViewerProps) {
   const isReadOnly = mode === 'preview';
 
-  const [nodes, , onNodesChangeInternal] = useNodesState(initNodes);
-  const [edges, , onEdgesChangeInternal] = useEdgesState(initEdges);
-
-  // 使用内部或外部回调
-  const handleNodesChange: OnNodesChange = useCallback(
-    (changes) => {
-      onNodesChangeInternal(changes);
-      externalOnNodesChange?.(changes);
-    },
-    [onNodesChangeInternal, externalOnNodesChange],
-  );
-
-  const handleEdgesChange: OnEdgesChange = useCallback(
-    (changes) => {
-      onEdgesChangeInternal(changes);
-      externalOnEdgesChange?.(changes);
-    },
-    [onEdgesChangeInternal, externalOnEdgesChange],
-  );
-
   const handleConnect = useCallback(
     (params: Connection) => {
       if (isReadOnly) return;
-      if (externalOnConnect) {
-        externalOnConnect(params);
-      }
+      externalOnConnect?.(params);
     },
     [isReadOnly, externalOnConnect],
   );
 
-  // MiniMap 节点着色
   const miniMapNodeColor = useMemo(
     () => (n: Node) => {
       const data = n.data as { nodeType?: string } | undefined;
@@ -98,8 +66,8 @@ export default function DAGViewer({
       edges={edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
-      onNodesChange={isReadOnly ? undefined : handleNodesChange}
-      onEdgesChange={isReadOnly ? undefined : handleEdgesChange}
+      onNodesChange={isReadOnly ? undefined : onNodesChange}
+      onEdgesChange={isReadOnly ? undefined : onEdgesChange}
       onConnect={handleConnect}
       nodesDraggable={!isReadOnly}
       nodesConnectable={!isReadOnly}

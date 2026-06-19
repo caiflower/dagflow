@@ -3,18 +3,17 @@
  */
 import type { Node, Edge } from '@xyflow/react';
 import type { FlowNode, FlowEdge } from '../types';
-import { getNodeTypeColor, getEdgeColor, getProtocolIcon } from './stateColor';
+import { getEdgeColor, getProtocolIcon } from './stateColor';
 
 // ===== Flow → ReactFlow =====
 
 /** FlowNode[] → ReactFlow Node[] */
 export function flowNodesToReactFlow(nodes: FlowNode[], nodeStates?: Record<string, string>): Node[] {
   return nodes.map((fn) => {
-    const colors = getNodeTypeColor(fn.type);
     const state = nodeStates?.[fn.id];
     return {
       id: fn.id,
-      type: fn.type, // custom node type
+      type: fn.type,
       position: fn.position || { x: 100, y: 100 },
       data: {
         label: fn.name,
@@ -23,15 +22,6 @@ export function flowNodesToReactFlow(nodes: FlowNode[], nodeStates?: Record<stri
         config: fn.config,
         state: state || 'pending',
         icon: getProtocolIcon(fn.protocol),
-      },
-      style: {
-        background: colors.bg,
-        border: `2px solid ${colors.border}`,
-        borderRadius: '8px',
-        color: colors.text,
-        padding: '0',
-        fontSize: '13px',
-        minWidth: '140px',
       },
     };
   });

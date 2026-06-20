@@ -20,7 +20,7 @@ interface BaseNodeProps {
   data: BaseNodeData;
   /** 顶部装饰色（节点类型色） */
   accentColor?: string;
-  /** 节点图标 */
+  /** 节点图标 (React element from Lucide) */
   icon?: ReactNode;
   /** 额外内容（展开区域） */
   extra?: ReactNode;
@@ -33,45 +33,61 @@ function BaseNode({ data, accentColor, icon, extra }: BaseNodeProps) {
 
   return (
     <div
-      className="relative min-w-[150px] rounded-lg shadow-md overflow-hidden transition-all cursor-pointer"
+      className="relative min-w-[160px] rounded-[var(--radius-md)] overflow-hidden transition-all duration-200 cursor-pointer"
       style={{
-        background: stateColor.bg,
-        border: `2px solid ${isSelected ? '#60a5fa' : stateColor.border}`,
+        background: 'var(--node-bg)',
+        border: `1.5px solid ${isSelected ? 'var(--node-selected-border)' : 'var(--node-border)'}`,
         boxShadow: isSelected
-          ? '0 0 0 2px rgba(96, 165, 250, 0.4), 0 4px 12px rgba(0,0,0,0.3)'
+          ? '0 0 0 3px color-mix(in srgb, var(--node-selected-border) 25%, transparent), var(--shadow-md)'
           : stateColor.glow !== 'none'
             ? stateColor.glow
-            : undefined,
+            : 'var(--shadow-sm)',
       }}
     >
-      {/* 入边 Handle */}
+      {/* In Handle */}
       {data.nodeType !== 'start' && (
         <Handle
           type="target"
           position={Position.Top}
-          className="!w-3 !h-3 !bg-gray-500 !border-2 !border-gray-400"
+          className="!w-2.5 !h-2.5 !border-2"
+          style={{
+            background: 'var(--node-bg)',
+            borderColor: accentColor || 'var(--border-default)',
+          }}
         />
       )}
 
-      {/* 顶部装饰条 */}
-      <div className="h-1" style={{ background: accentColor || '#3b82f6' }} />
+      {/* Accent stripe */}
+      <div className="h-0.5" style={{ background: accentColor || 'var(--accent-primary)' }} />
 
-      {/* 主体 */}
-      <div className="px-3 py-2">
-        <div className="flex items-center gap-2">
-          {icon && <span className="text-base flex-shrink-0">{icon}</span>}
+      {/* Body */}
+      <div className="px-3 py-2.5">
+        <div className="flex items-center gap-2.5">
+          {icon && (
+            <div
+              className="p-1.5 rounded-[var(--radius-sm)] flex-shrink-0"
+              style={{ background: accentColor ? `${accentColor}20` : 'var(--accent-subtle)' }}
+            >
+              {icon}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-white truncate">{data.label}</div>
+            <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+              {data.label}
+            </div>
             <div className="flex items-center gap-1.5 mt-0.5">
               {data.protocol && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-gray-300">
+                <span
+                  className="text-[10px] px-1.5 py-0.5 rounded-[var(--radius-sm)] font-mono"
+                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
+                >
                   {data.protocol}
                 </span>
               )}
               {state !== 'pending' && (
                 <span
-                  className="text-[10px] px-1.5 py-0.5 rounded"
-                  style={{ background: stateColor.border + '30', color: stateColor.border }}
+                  className="text-[10px] px-1.5 py-0.5 rounded-[var(--radius-sm)] font-medium"
+                  style={{ background: stateColor.border + '20', color: stateColor.border }}
                 >
                   {state}
                 </span>
@@ -79,15 +95,23 @@ function BaseNode({ data, accentColor, icon, extra }: BaseNodeProps) {
             </div>
           </div>
         </div>
-        {extra && <div className="mt-2 pt-2 border-t border-white/10">{extra}</div>}
+        {extra && (
+          <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+            {extra}
+          </div>
+        )}
       </div>
 
-      {/* 出边 Handle */}
+      {/* Out Handle */}
       {data.nodeType !== 'end' && (
         <Handle
           type="source"
           position={Position.Bottom}
-          className="!w-3 !h-3 !bg-gray-500 !border-2 !border-gray-400"
+          className="!w-2.5 !h-2.5 !border-2"
+          style={{
+            background: 'var(--node-bg)',
+            borderColor: accentColor || 'var(--border-default)',
+          }}
         />
       )}
     </div>

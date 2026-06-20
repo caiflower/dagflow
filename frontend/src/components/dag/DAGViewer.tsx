@@ -49,7 +49,6 @@ export default function DAGViewer({
 }: DAGViewerProps) {
   const isReadOnly = mode === 'preview';
 
-  // 将选中状态注入 node data
   const nodesWithSelection = useMemo(
     () =>
       nodes.map((n) => ({
@@ -99,38 +98,56 @@ export default function DAGViewer({
       elementsSelectable={!isReadOnly}
       fitView
       fitViewOptions={{ padding: 0.2 }}
-      className="bg-gray-900"
+      style={{ background: 'var(--canvas-bg)' }}
     >
-      <Background color="#374151" gap={16} size={1} />
-      <Controls className="!bg-gray-800 !border-gray-700 !rounded-lg [&>button]:!bg-gray-800 [&>button]:!border-gray-700 [&>button]:!text-gray-300 [&>button:hover]:!bg-gray-700" />
+      <Background color="var(--canvas-grid)" gap={16} size={1} />
+      <Controls
+        className="[&>button]:!border-[var(--control-border)] [&>button]:!rounded-[var(--radius-sm)]"
+        style={{
+          background: 'var(--control-bg)',
+          border: '1px solid var(--control-border)',
+          borderRadius: 'var(--radius-md)',
+        }}
+      />
       <MiniMap
         nodeColor={miniMapNodeColor}
-        className="!bg-gray-800 !border-gray-700 !rounded-lg"
-        maskColor="rgba(0,0,0,0.5)"
+        className="!border-[var(--control-border)] !rounded-[var(--radius-md)]"
+        style={{ background: 'var(--control-bg)', border: '1px solid var(--control-border)' }}
+        maskColor="rgba(0,0,0,0.4)"
       />
 
-      {/* 图例 */}
+      {/* Legend */}
       <Panel position="top-right">
-        <div className="bg-gray-800/90 backdrop-blur-sm border border-gray-700 rounded-lg p-3 text-xs space-y-1.5">
-          <div className="text-gray-400 font-medium mb-1">节点类型</div>
+        <div
+          className="rounded-[var(--radius-md)] p-3 text-xs space-y-1.5"
+          style={{
+            background: 'var(--glass-bg)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid var(--border-subtle)',
+          }}
+        >
+          <div className="font-medium mb-1" style={{ color: 'var(--text-muted)' }}>节点类型</div>
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded" style={{ background: getNodeTypeColor('start').border }} />
-            <span className="text-gray-300">开始</span>
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: getNodeTypeColor('start').border }} />
+            <span style={{ color: 'var(--text-secondary)' }}>开始</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded" style={{ background: getNodeTypeColor('task').border }} />
-            <span className="text-gray-300">任务</span>
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: getNodeTypeColor('task').border }} />
+            <span style={{ color: 'var(--text-secondary)' }}>任务</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded" style={{ background: getNodeTypeColor('branch').border }} />
-            <span className="text-gray-300">分支</span>
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: getNodeTypeColor('branch').border }} />
+            <span style={{ color: 'var(--text-secondary)' }}>分支</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded" style={{ background: getNodeTypeColor('end').border }} />
-            <span className="text-gray-300">结束</span>
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: getNodeTypeColor('end').border }} />
+            <span style={{ color: 'var(--text-secondary)' }}>结束</span>
           </div>
           {mode === 'editor' && (
-            <div className="text-gray-500 mt-2 pt-2 border-t border-gray-700">
+            <div
+              className="mt-2 pt-2 text-[10px]"
+              style={{ borderTop: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}
+            >
               拖拽移动 · 连线创建
             </div>
           )}

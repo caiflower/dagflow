@@ -8,10 +8,11 @@ import {
   type Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { ArrowLeft, Save, Play, Settings, GitBranch, Circle, Square, Plus } from 'lucide-react';
 import { DAGViewer } from '../components/dag';
 import { useFlowStore, useExecutionStore } from '../store';
 import { flowApi, protocolApi } from '../api/client';
-import type { FlowNode as FlowNodeType,  Protocol, ConfigField, NodeInput } from '../types';
+import type { FlowNode as FlowNodeType, Protocol, ConfigField, NodeInput } from '../types';
 import {
   flowNodesToReactFlow,
   flowEdgesToReactFlow,
@@ -21,12 +22,17 @@ import {
   parseEdgesJSON,
 } from '../utils/flowSerializer';
 import { autoLayout } from '../utils/dagLayout';
+import Button from '../components/ui/Button';
+import Modal from '../components/ui/Modal';
+import Input from '../components/ui/Input';
+import { TextArea } from '../components/ui/Input';
+import Badge from '../components/ui/Badge';
 
-const NODE_TEMPLATES: { type: FlowNodeType['type']; label: string; icon: string }[] = [
-  { type: 'task', label: '任务节点', icon: '⚙️' },
-  { type: 'branch', label: '分支节点', icon: '◇' },
-  { type: 'start', label: '开始节点', icon: '▶' },
-  { type: 'end', label: '结束节点', icon: '⏹' },
+const NODE_TEMPLATES: { type: FlowNodeType['type']; label: string; icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }> }[] = [
+  { type: 'task', label: '任务节点', icon: Settings },
+  { type: 'branch', label: '分支节点', icon: GitBranch },
+  { type: 'start', label: '开始节点', icon: Circle },
+  { type: 'end', label: '结束节点', icon: Square },
 ];
 
 let nodeCounter = 0;
@@ -45,17 +51,14 @@ export default function FlowEditorPage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [protocols, setProtocols] = useState<Protocol[]>([]);
 
-  // 加载 Flow
   useEffect(() => {
     if (id) loadFlow(Number(id));
   }, [id, loadFlow]);
 
-  // 加载协议列表
   useEffect(() => {
     protocolApi.list().then(setProtocols).catch(() => {});
   }, []);
 
-  // Flow 数据 → ReactFlow 状态
   useEffect(() => {
     if (!currentFlow) return;
     const flowNodes = parseNodesJSON(currentFlow.nodesJSON);
@@ -66,13 +69,11 @@ export default function FlowEditorPage() {
     setEdges(flowEdgesToReactFlow(flowEdges));
   }, [currentFlow, setNodes, setEdges]);
 
-  // 当前选中的节点
   const selectedNode = useMemo(
     () => nodes.find((n) => n.id === selectedNodeId) || null,
     [nodes, selectedNodeId],
   );
 
-  // 选中节点的协议 config schema
   const selectedProtocolSchema = useMemo(() => {
     if (!selectedNode) return null;
     const proto = (selectedNode.data as Record<string, unknown>)?.protocol as string;
@@ -80,7 +81,6 @@ export default function FlowEditorPage() {
     return protocols.find((p) => p.name === proto) || null;
   }, [selectedNode, protocols]);
 
-  // 连线
   const onConnect = useCallback(
     (params: Connection) => {
       const newEdge: Edge = {
@@ -95,17 +95,14 @@ export default function FlowEditorPage() {
     [setEdges],
   );
 
-  // 点击节点
   const handleNodeClick = useCallback((nodeId: string) => {
     setSelectedNodeId(nodeId);
   }, []);
 
-  // 点击画布空白处取消选中
   const handlePaneClick = useCallback(() => {
     setSelectedNodeId(null);
   }, []);
 
-  // 添加节点
   const addNode = useCallback(
     (type: FlowNodeType['type']) => {
       nodeCounter++;
@@ -126,7 +123,6 @@ export default function FlowEditorPage() {
     [setNodes],
   );
 
-  // 更新选中节点的属性
   const updateNodeProp = useCallback(
     (field: string, value: unknown) => {
       if (!selectedNodeId) return;
@@ -138,7 +134,6 @@ export default function FlowEditorPage() {
             data.label = value;
           } else if (field === 'protocol') {
             data.protocol = value;
-            // 切换协议时重置 config
             data.config = {};
           } else if (field.startsWith('config.')) {
             const key = field.slice(7);
@@ -157,7 +152,6 @@ export default function FlowEditorPage() {
     [selectedNodeId, setNodes],
   );
 
-  // 删除选中节点
   const deleteSelectedNode = useCallback(() => {
     if (!selectedNodeId) return;
     setNodes((prev) => prev.filter((n) => n.id !== selectedNodeId));
@@ -165,7 +159,6 @@ export default function FlowEditorPage() {
     setSelectedNodeId(null);
   }, [selectedNodeId, setNodes, setEdges]);
 
-  // 可编辑输入的节点列表（task / branch）
   const inputNodes = useMemo(() => {
     return nodes.filter((n) => {
       const data = n.data as Record<string, unknown>;
@@ -174,7 +167,6 @@ export default function FlowEditorPage() {
     });
   }, [nodes]);
 
-  // 保存
   const handleSave = useCallback(async () => {
     if (!currentFlow) return;
     setSaving(true);
@@ -192,7 +184,6 @@ export default function FlowEditorPage() {
     }
   }, [currentFlow, nodes, edges, loadFlow]);
 
-  // 运行 Flow
   const handleRun = useCallback(async () => {
     if (!currentFlow) return;
     setRunning(true);
@@ -200,63 +191,104 @@ export default function FlowEditorPage() {
       const inputs: NodeInput[] = Object.entries(runNodeInputs)
         .filter(([, v]) => v.trim() !== '')
         .map(([nodeName, input]) => ({ nodeName, input }));
-      const exec = await runFlow(currentFlow.id, inputs.length > 0 ? inputs : undefined);
+      await runFlow(currentFlow.id, inputs.length > 0 ? inputs : undefined);
       setShowRunModal(false);
       setRunNodeInputs({});
-      // 跳转到执行页
       navigate('/executions');
     } finally {
       setRunning(false);
     }
   }, [currentFlow, runNodeInputs, runFlow, navigate]);
 
-  if (!currentFlow) return <div className="p-6 text-gray-500">加载中...</div>;
+  if (!currentFlow) return (
+    <div className="flex items-center justify-center h-full" style={{ color: 'var(--text-muted)' }}>
+      <div className="animate-spin w-6 h-6 border-2 border-current border-t-transparent rounded-full mr-3" />
+      加载中...
+    </div>
+  );
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex justify-between items-center p-4 border-b border-gray-700">
+      {/* Top Bar */}
+      <div
+        className="flex items-center justify-between px-4 h-12 flex-shrink-0"
+        style={{ borderBottom: '1px solid var(--border-subtle)' }}
+      >
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/flows')} className="text-gray-400 hover:text-white text-sm">
-            ← 返回
+          <button
+            onClick={() => navigate('/flows')}
+            className="flex items-center gap-1.5 text-sm px-2 py-1 rounded-[var(--radius-sm)] transition-colors"
+            style={{ color: 'var(--text-secondary)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--bg-secondary)';
+              e.currentTarget.style.color = 'var(--text-primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '';
+              e.currentTarget.style.color = 'var(--text-secondary)';
+            }}
+          >
+            <ArrowLeft size={15} />
+            返回
           </button>
-          <h2 className="text-lg font-bold">{currentFlow.name}</h2>
-          <span className="text-xs text-gray-500">v{currentFlow.version}</span>
+          <div className="w-px h-5" style={{ background: 'var(--border-default)' }} />
+          <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{currentFlow.name}</h2>
+          <Badge variant="default">v{currentFlow.version}</Badge>
         </div>
-        <div className="flex gap-2">
-          <button
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => { setRunNodeInputs({}); setShowRunModal(true); }}
-            className="px-4 py-1.5 bg-green-600 hover:bg-green-700 rounded text-sm"
           >
-            ▶ 运行
-          </button>
-          <button
+            <Play size={14} /> 运行
+          </Button>
+          <Button
+            size="sm"
             onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded text-sm"
+            loading={saving}
           >
-            {saving ? '保存中...' : '保存'}
-          </button>
+            <Save size={14} /> {saving ? '保存中...' : '保存'}
+          </Button>
         </div>
       </div>
+
       <div className="flex-1 flex overflow-hidden">
-        {/* 左侧栏：添加节点 */}
-        <div className="w-48 bg-gray-800 border-r border-gray-700 p-3 space-y-2 flex-shrink-0 overflow-y-auto">
-          <div className="text-xs text-gray-400 font-medium mb-2">添加节点</div>
-          {NODE_TEMPLATES.map((t) => (
-            <button
-              key={t.type}
-              onClick={() => addNode(t.type)}
-              className="w-full flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm text-gray-200 transition-colors"
-            >
-              <span>{t.icon}</span>
-              <span>{t.label}</span>
-            </button>
-          ))}
-          <div className="text-[10px] text-gray-500 mt-4 pt-3 border-t border-gray-700">
+        {/* Left Panel: Add Nodes */}
+        <div
+          className="w-52 flex-shrink-0 overflow-y-auto p-3 space-y-1.5"
+          style={{ borderRight: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)' }}
+        >
+          <div className="text-[11px] font-medium uppercase tracking-wider px-2 mb-2" style={{ color: 'var(--text-muted)' }}>
+            添加节点
+          </div>
+          {NODE_TEMPLATES.map((t) => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.type}
+                onClick={() => addNode(t.type)}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-[var(--radius-md)] transition-all duration-150"
+                style={{ color: 'var(--text-primary)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-tertiary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}
+              >
+                <div className="p-1 rounded-[var(--radius-sm)]" style={{ background: 'var(--accent-subtle)' }}>
+                  <Icon size={14} style={{ color: 'var(--accent-primary)' }} />
+                </div>
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
+          <div
+            className="text-[11px] mt-4 pt-3 px-2 leading-relaxed"
+            style={{ borderTop: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}
+          >
             点击添加到画布，<br />拖拽调整位置，<br />连接 Handle 创建边
           </div>
         </div>
-        {/* 画布 */}
+
+        {/* Canvas */}
         <div className="flex-1 min-w-0">
           <DAGViewer
             nodes={nodes}
@@ -270,7 +302,8 @@ export default function FlowEditorPage() {
             selectedNodeId={selectedNodeId || undefined}
           />
         </div>
-        {/* 右侧栏：属性编辑 */}
+
+        {/* Right Panel: Node Properties */}
         {selectedNode && (
           <NodePropsPanel
             node={selectedNode}
@@ -282,22 +315,53 @@ export default function FlowEditorPage() {
           />
         )}
       </div>
-      {/* 运行弹窗 */}
-      {showRunModal && (
-        <RunModal
-          nodes={inputNodes}
-          nodeInputs={runNodeInputs}
-          onUpdate={(name, val) => setRunNodeInputs((prev) => ({ ...prev, [name]: val }))}
-          onRun={handleRun}
-          onCancel={() => { setShowRunModal(false); setRunNodeInputs({}); }}
-          running={running}
-        />
-      )}
+
+      {/* Run Modal */}
+      <Modal
+        open={showRunModal}
+        onClose={() => { setShowRunModal(false); setRunNodeInputs({}); }}
+        title="运行 Flow"
+        width={520}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setShowRunModal(false); setRunNodeInputs({}); }}>
+              取消
+            </Button>
+            <Button onClick={handleRun} loading={running}>
+              <Play size={14} /> {running ? '执行中...' : '确认执行'}
+            </Button>
+          </>
+        }
+      >
+        {inputNodes.length === 0 ? (
+          <div className="text-center py-8" style={{ color: 'var(--text-muted)' }}>
+            无可设置输入的节点
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {inputNodes.map((n) => {
+              const data = n.data as Record<string, unknown>;
+              const name = (data.label as string) || n.id;
+              const protocol = (data.protocol as string) || '';
+              return (
+                <TextArea
+                  key={n.id}
+                  label={`${name}${protocol ? ` (${protocol})` : ''}`}
+                  value={runNodeInputs[name] || ''}
+                  onChange={(e) => setRunNodeInputs((prev) => ({ ...prev, [name]: e.target.value }))}
+                  rows={2}
+                  placeholder={`输入 JSON 参数，例如: {"key": "value"}`}
+                />
+              );
+            })}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
 
-// ===== 节点属性编辑面板 =====
+// ===== Node Properties Panel =====
 interface NodePropsPanelProps {
   node: Node;
   protocols: Protocol[];
@@ -315,45 +379,74 @@ function NodePropsPanel({ node, protocols, protocolSchema, onUpdate, onDelete, o
   const isEditable = nodeType === 'task' || nodeType === 'branch';
 
   return (
-    <div className="w-72 bg-gray-800 border-l border-gray-700 flex-shrink-0 flex flex-col overflow-hidden">
-      {/* 头部 */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-700">
-        <span className="text-sm font-medium text-gray-200">节点属性</span>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-xs">✕</button>
+    <div
+      className="w-72 flex-shrink-0 flex flex-col overflow-hidden"
+      style={{ borderLeft: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)' }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-4 h-12"
+        style={{ borderBottom: '1px solid var(--border-subtle)' }}
+      >
+        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>节点属性</span>
+        <button
+          onClick={onClose}
+          className="p-1 rounded-[var(--radius-sm)] transition-colors"
+          style={{ color: 'var(--text-muted)' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--bg-tertiary)';
+            e.currentTarget.style.color = 'var(--text-primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '';
+            e.currentTarget.style.color = 'var(--text-muted)';
+          }}
+        >
+          ✕
+        </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-4">
-        {/* 节点 ID（只读） */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* ID (read-only) */}
         <div>
-          <label className="block text-[10px] text-gray-500 mb-1">ID</label>
-          <div className="text-xs text-gray-400 bg-gray-900 rounded px-2 py-1.5 font-mono">{node.id}</div>
+          <label className="block text-[11px] font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>ID</label>
+          <div
+            className="text-xs font-mono px-2.5 py-1.5 rounded-[var(--radius-sm)]"
+            style={{ background: 'var(--bg-input)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
+          >
+            {node.id}
+          </div>
         </div>
 
-        {/* 名称 */}
+        {/* Name */}
+        <Input
+          label="名称"
+          type="text"
+          value={(data.label as string) || ''}
+          onChange={(e) => onUpdate('label', e.target.value)}
+        />
+
+        {/* Type (read-only) */}
         <div>
-          <label className="block text-[10px] text-gray-500 mb-1">名称</label>
-          <input
-            type="text"
-            value={(data.label as string) || ''}
-            onChange={(e) => onUpdate('label', e.target.value)}
-            className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
-          />
+          <label className="block text-[11px] font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>类型</label>
+          <Badge variant="default">{nodeType}</Badge>
         </div>
 
-        {/* 类型（只读） */}
-        <div>
-          <label className="block text-[10px] text-gray-500 mb-1">类型</label>
-          <div className="text-xs text-gray-400 bg-gray-900 rounded px-2 py-1.5">{nodeType}</div>
-        </div>
-
-        {/* 协议选择（仅 task/branch 节点） */}
+        {/* Protocol select */}
         {isEditable && (
-          <div>
-            <label className="block text-[10px] text-gray-500 mb-1">协议</label>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>协议</label>
             <select
               value={protocol}
               onChange={(e) => onUpdate('protocol', e.target.value)}
-              className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
+              className="w-full px-3 py-2 text-sm rounded-[var(--radius-md)] border outline-none transition-all"
+              style={{
+                background: 'var(--bg-input)',
+                borderColor: 'var(--border-default)',
+                color: 'var(--text-primary)',
+              }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border-default)'; }}
             >
               <option value="">选择协议...</option>
               {protocols.map((p) => (
@@ -363,15 +456,17 @@ function NodePropsPanel({ node, protocols, protocolSchema, onUpdate, onDelete, o
               ))}
             </select>
             {protocolSchema?.description && (
-              <p className="text-[10px] text-gray-500 mt-1">{protocolSchema.description}</p>
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{protocolSchema.description}</p>
             )}
           </div>
         )}
 
-        {/* Config 字段（基于协议 schema） */}
+        {/* Config fields */}
         {isEditable && protocolSchema && protocolSchema.configSchema?.fields.length > 0 && (
           <div className="space-y-3">
-            <div className="text-[10px] text-gray-500 font-medium">配置参数</div>
+            <div className="text-[11px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+              配置参数
+            </div>
             {protocolSchema.configSchema.fields.map((field: ConfigField) => (
               <ConfigFieldInput
                 key={field.name}
@@ -383,78 +478,78 @@ function NodePropsPanel({ node, protocols, protocolSchema, onUpdate, onDelete, o
           </div>
         )}
 
-        {/* 无 schema 时的手动 config 编辑 */}
+        {/* Manual config editing */}
         {isEditable && protocol && !protocolSchema && (
           <div className="space-y-3">
-            <div className="text-[10px] text-gray-500 font-medium">配置参数</div>
+            <div className="text-[11px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+              配置参数
+            </div>
             {Object.entries(config).map(([k, v]) => (
-              <div key={k}>
-                <label className="block text-[10px] text-gray-500 mb-1">{k}</label>
-                <input
-                  type="text"
-                  value={String(v ?? '')}
-                  onChange={(e) => onUpdate(`config.${k}`, e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
+              <Input
+                key={k}
+                label={k}
+                type="text"
+                value={String(v ?? '')}
+                onChange={(e) => onUpdate(`config.${k}`, e.target.value)}
+              />
             ))}
             <button
               onClick={() => {
                 const key = prompt('输入参数名:');
                 if (key) onUpdate(`config.${key}`, '');
               }}
-              className="w-full text-xs text-blue-400 hover:text-blue-300 py-1"
+              className="flex items-center gap-1 text-xs font-medium px-2 py-1.5 rounded-[var(--radius-sm)] transition-colors"
+              style={{ color: 'var(--accent-primary)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-subtle)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}
             >
-              + 添加参数
+              <Plus size={12} /> 添加参数
             </button>
           </div>
         )}
       </div>
 
-      {/* 底部：删除按钮 */}
-      <div className="p-3 border-t border-gray-700">
-        <button
-          onClick={onDelete}
-          className="w-full px-3 py-1.5 bg-red-900/40 hover:bg-red-900/60 text-red-400 rounded text-sm transition-colors"
-        >
+      {/* Footer */}
+      <div className="p-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+        <Button variant="danger" size="sm" className="w-full" onClick={onDelete}>
           删除节点
-        </button>
+        </Button>
       </div>
     </div>
   );
 }
 
-// ===== Config 字段输入组件 =====
+// ===== Config Field Input =====
 function ConfigFieldInput({ field, value, onChange }: { field: ConfigField; value: unknown; onChange: (v: unknown) => void }) {
   const strValue = value !== undefined && value !== null ? String(value) : field.default || '';
 
   if (field.type === 'textarea') {
     return (
-      <div>
-        <label className="block text-[10px] text-gray-500 mb-1">
-          {field.label} {field.required && <span className="text-red-400">*</span>}
-        </label>
-        <textarea
-          value={strValue}
-          onChange={(e) => onChange(e.target.value)}
-          rows={3}
-          className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none resize-y"
-          placeholder={field.description}
-        />
-      </div>
+      <TextArea
+        label={field.label}
+        value={strValue}
+        onChange={(e) => onChange(e.target.value)}
+        rows={3}
+        placeholder={field.description}
+      />
     );
   }
 
   if (field.type === 'select' && field.options?.length) {
     return (
-      <div>
-        <label className="block text-[10px] text-gray-500 mb-1">
-          {field.label} {field.required && <span className="text-red-400">*</span>}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
+          {field.label} {field.required && <span style={{ color: 'var(--danger)' }}>*</span>}
         </label>
         <select
           value={strValue}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
+          className="w-full px-3 py-2 text-sm rounded-[var(--radius-md)] border outline-none transition-all"
+          style={{
+            background: 'var(--bg-input)',
+            borderColor: 'var(--border-default)',
+            color: 'var(--text-primary)',
+          }}
         >
           <option value="">选择...</option>
           {field.options.map((opt) => (
@@ -467,101 +562,27 @@ function ConfigFieldInput({ field, value, onChange }: { field: ConfigField; valu
 
   if (field.type === 'boolean') {
     return (
-      <div className="flex items-center justify-between">
-        <label className="text-[10px] text-gray-500">
-          {field.label} {field.required && <span className="text-red-400">*</span>}
+      <div className="flex items-center justify-between py-1">
+        <label className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
+          {field.label} {field.required && <span style={{ color: 'var(--danger)' }}>*</span>}
         </label>
         <input
           type="checkbox"
           checked={strValue === 'true' || strValue === '1'}
           onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
-          className="rounded border-gray-600 bg-gray-900"
+          className="rounded"
         />
       </div>
     );
   }
 
-  // string / number / default
   return (
-    <div>
-      <label className="block text-[10px] text-gray-500 mb-1">
-        {field.label} {field.required && <span className="text-red-400">*</span>}
-      </label>
-      <input
-        type={field.type === 'number' ? 'number' : 'text'}
-        value={strValue}
-        onChange={(e) => onChange(field.type === 'number' ? Number(e.target.value) : e.target.value)}
-        className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
-        placeholder={field.description}
-      />
-    </div>
-  );
-}
-
-// ===== 运行弹窗组件 =====
-function RunModal({
-  nodes,
-  nodeInputs,
-  onUpdate,
-  onRun,
-  onCancel,
-  running,
-}: {
-  nodes: Node[];
-  nodeInputs: Record<string, string>;
-  onUpdate: (nodeName: string, value: string) => void;
-  onRun: () => void;
-  onCancel: () => void;
-  running: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-[500px] max-h-[80vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-200">▶ 运行 Flow</h3>
-          <button onClick={onCancel} className="text-gray-500 hover:text-gray-300">✕</button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {nodes.length === 0 && (
-            <div className="text-gray-500 text-sm text-center py-4">无可设置输入的节点</div>
-          )}
-          {nodes.map((n) => {
-            const data = n.data as Record<string, unknown>;
-            const name = (data.label as string) || n.id;
-            const protocol = (data.protocol as string) || '';
-            return (
-              <div key={n.id}>
-                <label className="block text-xs text-gray-400 mb-1">
-                  <span className="font-medium text-gray-300">{name}</span>
-                  {protocol && <span className="text-gray-500 ml-2">({protocol})</span>}
-                </label>
-                <textarea
-                  value={nodeInputs[name] || ''}
-                  onChange={(e) => onUpdate(name, e.target.value)}
-                  rows={2}
-                  placeholder={`输入 JSON 参数，例如: {"key": "value"}`}
-                  className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-gray-200 focus:border-blue-500 focus:outline-none resize-y font-mono"
-                />
-              </div>
-            );
-          })}
-        </div>
-        <div className="flex gap-3 p-4 border-t border-gray-700">
-          <button
-            onClick={onCancel}
-            className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm"
-          >
-            取消
-          </button>
-          <button
-            onClick={onRun}
-            disabled={running}
-            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 rounded text-sm"
-          >
-            {running ? '执行中...' : '▶ 确认执行'}
-          </button>
-        </div>
-      </div>
-    </div>
+    <Input
+      label={field.label}
+      type={field.type === 'number' ? 'number' : 'text'}
+      value={strValue}
+      onChange={(e) => onChange(field.type === 'number' ? Number(e.target.value) : e.target.value)}
+      placeholder={field.description}
+    />
   );
 }

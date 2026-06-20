@@ -1,10 +1,23 @@
 /**
  * 具体节点类型组件 — StartNode / EndNode / TaskNode / BranchNode
+ * 使用 Lucide 图标替代 emoji
  */
 import { memo } from 'react';
 import type { NodeProps, Node } from '@xyflow/react';
+import { Play, Square, Settings, GitBranch, Globe, Radio, Terminal, Link } from 'lucide-react';
 import BaseNode, { type BaseNodeData } from './BaseNode';
-import { getNodeTypeColor, getProtocolIcon } from '../../../utils/stateColor';
+import { getNodeTypeColor } from '../../../utils/stateColor';
+
+const lucideIcons: Record<string, React.ComponentType<{ size?: number; style?: React.CSSProperties }>> = {
+  Globe, Radio, Terminal, Link, Settings,
+};
+
+function getProtocolLucideIcon(protocol: string) {
+  const iconMap: Record<string, string> = {
+    http: 'Globe', grpc: 'Radio', local: 'Terminal', mcp: 'Link',
+  };
+  return lucideIcons[iconMap[protocol] || 'Settings'] || Settings;
+}
 
 // ===== StartNode =====
 function StartNode({ data }: NodeProps<Node<BaseNodeData>>) {
@@ -13,7 +26,7 @@ function StartNode({ data }: NodeProps<Node<BaseNodeData>>) {
     <BaseNode
       data={data}
       accentColor={colors.border}
-      icon={<span className="text-green-400">▶</span>}
+      icon={<Play size={14} style={{ color: colors.border }} />}
     />
   );
 }
@@ -25,7 +38,7 @@ function EndNode({ data }: NodeProps<Node<BaseNodeData>>) {
     <BaseNode
       data={data}
       accentColor={colors.border}
-      icon={<span className="text-red-400">⏹</span>}
+      icon={<Square size={14} style={{ color: colors.border }} />}
     />
   );
 }
@@ -33,23 +46,24 @@ function EndNode({ data }: NodeProps<Node<BaseNodeData>>) {
 // ===== TaskNode =====
 function TaskNode({ data }: NodeProps<Node<BaseNodeData>>) {
   const colors = getNodeTypeColor('task');
-  const icon = data.icon || getProtocolIcon(data.protocol || '');
+  const protocol = (data.protocol as string) || '';
+  const IconComp = getProtocolLucideIcon(protocol);
   return (
     <BaseNode
       data={data}
       accentColor={colors.border}
-      icon={<span>{icon}</span>}
+      icon={<IconComp size={14} style={{ color: colors.border }} />}
       extra={
         data.config && Object.keys(data.config).length > 0 ? (
-          <div className="text-[10px] text-gray-400 space-y-0.5">
+          <div className="text-[10px] space-y-0.5">
             {Object.entries(data.config).slice(0, 3).map(([k, v]) => (
               <div key={k} className="truncate">
-                <span className="text-gray-500">{k}:</span>{' '}
-                <span className="text-gray-300">{String(v).slice(0, 20)}</span>
+                <span style={{ color: 'var(--text-muted)' }}>{k}:</span>{' '}
+                <span style={{ color: 'var(--text-secondary)' }}>{String(v).slice(0, 20)}</span>
               </div>
             ))}
             {Object.keys(data.config).length > 3 && (
-              <div className="text-gray-600">+{Object.keys(data.config).length - 3} more</div>
+              <div style={{ color: 'var(--text-muted)' }}>+{Object.keys(data.config).length - 3} more</div>
             )}
           </div>
         ) : null
@@ -65,10 +79,10 @@ function BranchNode({ data }: NodeProps<Node<BaseNodeData>>) {
     <BaseNode
       data={data}
       accentColor={colors.border}
-      icon={<span className="text-yellow-400">◇</span>}
+      icon={<GitBranch size={14} style={{ color: colors.border }} />}
       extra={
         data.config?.condition ? (
-          <div className="text-[10px] text-yellow-200/70 truncate">
+          <div className="text-[10px] truncate" style={{ color: 'var(--warning)' }}>
             条件: {String(data.config.condition)}
           </div>
         ) : null
@@ -77,7 +91,7 @@ function BranchNode({ data }: NodeProps<Node<BaseNodeData>>) {
   );
 }
 
-// ===== 导出 nodeTypes 注册对象 =====
+// ===== Export nodeTypes =====
 export const nodeTypes = {
   start: memo(StartNode),
   end: memo(EndNode),

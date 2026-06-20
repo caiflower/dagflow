@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Plus, Search, Trash2, GitBranch } from 'lucide-react';
 import { useFlowStore } from '../store';
+import Button from '../components/ui/Button';
+import Modal from '../components/ui/Modal';
+import Input from '../components/ui/Input';
+import Badge from '../components/ui/Badge';
+import { statusBadgeVariant } from '../utils/stateColor';
 
 export default function FlowListPage() {
   const { flows, total, loading, loadFlows, deleteFlow, createFlow } = useFlowStore();
@@ -24,70 +30,168 @@ export default function FlowListPage() {
     setNewDesc('');
   };
 
-  const stateColors: Record<string, string> = {
-    1: 'bg-green-500/20 text-green-400',
-    0: 'bg-red-500/20 text-red-400',
-  };
-
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Flow 列表</h2>
-        <button onClick={() => setShowCreate(true)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm">
-          + 新建 Flow
-        </button>
+    <div className="max-w-5xl mx-auto px-6 py-8">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            Flows
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+            管理和编排你的工作流
+          </p>
+        </div>
+        <Button onClick={() => setShowCreate(true)} size="md">
+          <Plus size={16} /> 新建 Flow
+        </Button>
       </div>
 
-      <input
-        type="text" placeholder="搜索 Flow..." value={searchName}
-        onChange={(e) => setSearchName(e.target.value)}
-        className="w-full mb-4 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500"
-      />
+      {/* Search */}
+      <div className="relative mb-6">
+        <Search
+          size={16}
+          className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+          style={{ color: 'var(--text-muted)' }}
+        />
+        <input
+          type="text"
+          placeholder="搜索 Flow..."
+          value={searchName}
+          onChange={(e) => setSearchName(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 text-sm rounded-[var(--radius-md)] border outline-none transition-all"
+          style={{
+            background: 'var(--bg-input)',
+            borderColor: 'var(--border-default)',
+            color: 'var(--text-primary)',
+          }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border-default)'; }}
+        />
+      </div>
 
+      {/* Flow Cards */}
       {loading ? (
-        <div className="text-center py-12 text-gray-500">加载中...</div>
+        <div className="text-center py-16" style={{ color: 'var(--text-muted)' }}>
+          <div className="animate-spin w-6 h-6 border-2 border-current border-t-transparent rounded-full mx-auto mb-3" />
+          加载中...
+        </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-3">
           {flows.map((flow) => (
-            <div key={flow.id} className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-gray-600 cursor-pointer"
-              onClick={() => navigate(`/flows/${flow.id}`)}>
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-semibold text-lg">{flow.name}</h3>
-                  <p className="text-sm text-gray-400 mt-1">{flow.description || '无描述'}</p>
+            <div
+              key={flow.id}
+              className="group rounded-[var(--radius-lg)] p-4 cursor-pointer transition-all duration-200"
+              style={{
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-subtle)',
+              }}
+              onClick={() => navigate(`/flows/${flow.id}`)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                e.currentTarget.style.boxShadow = '';
+                e.currentTarget.style.transform = '';
+              }}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  <div
+                    className="p-2 rounded-[var(--radius-md)] flex-shrink-0 mt-0.5"
+                    style={{ background: 'var(--accent-subtle)' }}
+                  >
+                    <GitBranch size={18} style={{ color: 'var(--accent-primary)' }} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>
+                      {flow.name}
+                    </h3>
+                    <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                      {flow.description || '无描述'}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-0.5 rounded text-xs ${stateColors[flow.status] || ''}`}>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Badge variant={statusBadgeVariant(flow.status)} dot>
                     {flow.status === 1 ? '启用' : '禁用'}
-                  </span>
-                  <span className="text-xs text-gray-500">v{flow.version}</span>
-                  <button onClick={(e) => { e.stopPropagation(); deleteFlow(flow.id); }}
-                    className="text-red-400 hover:text-red-300 text-sm px-2">删除</button>
+                  </Badge>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>v{flow.version}</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteFlow(flow.id); }}
+                    className="p-1.5 rounded-[var(--radius-sm)] opacity-0 group-hover:opacity-100 transition-all"
+                    style={{ color: 'var(--text-muted)' }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--danger-subtle)';
+                      e.currentTarget.style.color = 'var(--danger)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '';
+                      e.currentTarget.style.color = 'var(--text-muted)';
+                    }}
+                    title="删除"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
             </div>
           ))}
-          {flows.length === 0 && <div className="text-center py-12 text-gray-500">暂无 Flow，点击上方按钮创建</div>}
+          {flows.length === 0 && (
+            <div className="text-center py-16 rounded-[var(--radius-lg)]" style={{ background: 'var(--bg-secondary)', border: '1px dashed var(--border-default)' }}>
+              <GitBranch size={40} className="mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
+              <p style={{ color: 'var(--text-muted)' }}>暂无 Flow，点击上方按钮创建</p>
+            </div>
+          )}
         </div>
       )}
-      <div className="mt-4 text-sm text-gray-500">共 {total} 条记录</div>
 
-      {/* Create Dialog */}
-      {showCreate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-xl p-6 w-96 border border-gray-700">
-            <h3 className="text-lg font-bold mb-4">新建 Flow</h3>
-            <input type="text" placeholder="Flow 名称" value={newName} onChange={(e) => setNewName(e.target.value)}
-              className="w-full mb-3 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm focus:outline-none focus:border-blue-500" />
-            <textarea placeholder="描述（可选）" value={newDesc} onChange={(e) => setNewDesc(e.target.value)}
-              className="w-full mb-4 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm h-20 focus:outline-none focus:border-blue-500" />
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-gray-400 hover:text-white">取消</button>
-              <button onClick={handleCreate} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm">创建</button>
-            </div>
+      <div className="mt-4 text-xs" style={{ color: 'var(--text-muted)' }}>
+        共 {total} 条记录
+      </div>
+
+      {/* Create Modal */}
+      <Modal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        title="新建 Flow"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowCreate(false)}>取消</Button>
+            <Button onClick={handleCreate} disabled={!newName.trim()}>创建</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label="Flow 名称"
+            placeholder="输入 Flow 名称"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            autoFocus
+          />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>描述（可选）</label>
+            <textarea
+              placeholder="描述你的工作流..."
+              value={newDesc}
+              onChange={(e) => setNewDesc(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 text-sm rounded-[var(--radius-md)] border outline-none transition-all resize-none"
+              style={{
+                background: 'var(--bg-input)',
+                borderColor: 'var(--border-default)',
+                color: 'var(--text-primary)',
+              }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border-default)'; }}
+            />
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

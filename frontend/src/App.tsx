@@ -5,6 +5,7 @@ import FlowListPage from './pages/FlowListPage';
 import FlowEditorPage from './pages/FlowEditorPage';
 import ExecutionPage from './pages/ExecutionPage';
 import ProtocolPage from './pages/ProtocolPage';
+import ToastProvider from './components/ui/Toast';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           </Route>
         </Routes>
       </BrowserRouter>
+      <ToastProvider />
     </ThemeProvider>
   );
 }

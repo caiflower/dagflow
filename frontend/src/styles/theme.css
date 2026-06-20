@@ -111,3 +111,23 @@
   --control-hover-bg: #2c2c2e;
   --control-text: #a1a1a6;
 }
+
+/* ============================================
+   DAG Node Animations
+   ============================================ */
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 4px var(--glow-color, #2997ff80); }
+  50% { box-shadow: 0 0 12px var(--glow-color, #2997ff80); }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Handle hover accent fill */
+.dag-handle {
+  --handle-accent: var(--border-default);
+}
+.dag-handle:hover {
+  background: var(--handle-accent) !important;
+}

@@ -1,14 +1,28 @@
 import axios from 'axios';
 import type { Flow, FlowNode, FlowEdge, Protocol, Execution, NodeInput, PageResult } from '../types';
 
+export class ApiError extends Error {
+  code: number;
+  type: string;
+  constructor(code: number, message: string, type: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = code;
+    this.type = type;
+  }
+}
+
 const api = axios.create({
   baseURL: '/api/v1',
   timeout: 30000,
 });
 
 /** 解包 GRPC 响应: {requestID, data: <payload>} → payload */
-function unwrap<T>(r: { data: { data: T } }): T {
-  return r.data.data;
+function unwrap<T>(r: { data: { data?: T; error?: { code: number; message: string; type: string } } }): T {
+  if (r.data.error) {
+    throw new ApiError(r.data.error.code, r.data.error.message, r.data.error.type);
+  }
+  return r.data.data as T;
 }
 
 /** 前端 FlowNode → Proto FlowNode 格式 */

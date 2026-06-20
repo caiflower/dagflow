@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/caiflower/common-tools/web/common/e"
+
 	"github.com/caiflower/common-tools/pkg/basic"
 	"github.com/caiflower/common-tools/pkg/bean"
 
@@ -46,7 +48,7 @@ type ListFlowReq struct {
 // Create 创建 Flow
 func (s *FlowService) Create(ctx context.Context, req *CreateFlowReq) (*model.Flow, error) {
 	if err := converter.ValidateFlow(req.Nodes, req.Edges); err != nil {
-		return nil, fmt.Errorf("invalid flow: %w", err)
+		return nil, e.NewApiError(e.InvalidArgument, err.Error(), err)
 	}
 
 	flow := &model.Flow{
@@ -72,7 +74,7 @@ func (s *FlowService) Create(ctx context.Context, req *CreateFlowReq) (*model.Fl
 func (s *FlowService) Get(ctx context.Context, id int64) (*model.Flow, error) {
 	flow, err := s.FlowDAO.GetByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("get flow %d: %w", id, err)
+		return nil, e.NewApiError(e.NotFound, fmt.Sprintf("flow %d not found", id), err)
 	}
 	return flow, nil
 }
@@ -91,7 +93,7 @@ func (s *FlowService) List(ctx context.Context, req *ListFlowReq) ([]model.Flow,
 func (s *FlowService) Update(ctx context.Context, req *UpdateFlowReq) (*model.Flow, error) {
 	existing, err := s.FlowDAO.GetByID(ctx, req.ID)
 	if err != nil {
-		return nil, fmt.Errorf("flow not found: %w", err)
+		return nil, e.NewApiError(e.NotFound, fmt.Sprintf("flow %d not found", req.ID), err)
 	}
 
 	if req.Name != "" {
@@ -102,7 +104,7 @@ func (s *FlowService) Update(ctx context.Context, req *UpdateFlowReq) (*model.Fl
 	}
 	if req.Nodes != nil {
 		if err := converter.ValidateFlow(req.Nodes, req.Edges); err != nil {
-			return nil, fmt.Errorf("invalid flow: %w", err)
+			return nil, e.NewApiError(e.InvalidArgument, err.Error(), err)
 		}
 		existing.NodesJSON = converter.NodesToJSON(req.Nodes)
 	}

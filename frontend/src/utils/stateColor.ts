@@ -14,9 +14,9 @@ export const nodeTypeColorMap: Record<string, { bg: string; border: string; text
 /** 节点运行状态颜色 */
 export const nodeStateColorMap: Record<string, { bg: string; border: string; glow: string }> = {
   pending:   { bg: '#1c1c1e', border: '#636366', glow: 'none' },
-  running:   { bg: '#0a2a4a', border: '#2997ff', glow: '0 0 8px #2997ff80' },
-  succeeded: { bg: '#0a3a1a', border: '#34c759', glow: '0 0 8px #34c75980' },
-  failed:    { bg: '#3a1010', border: '#ff3b30', glow: '0 0 8px #ff3b3080' },
+  running:   { bg: '#0a2a4a', border: '#40a0ff', glow: '0 0 8px #40a0ff80' },
+  succeeded: { bg: '#0a3a1a', border: '#30d158', glow: '0 0 8px #30d15880' },
+  failed:    { bg: '#3a1010', border: '#ff453a', glow: '0 0 8px #ff453a80' },
   skipped:   { bg: '#1c1c1e', border: '#545458', glow: 'none' },
 };
 

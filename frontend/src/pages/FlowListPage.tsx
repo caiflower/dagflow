@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { toast } from '../store/toastStore';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Trash2, GitBranch } from 'lucide-react';
 import { useFlowStore } from '../store';
+import { ApiError } from '../api/client';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
@@ -24,10 +26,15 @@ export default function FlowListPage() {
       { id: 'start', name: '开始', type: 'start' as const, protocol: '', config: {}, position: { x: 250, y: 50 } },
       { id: 'end', name: '结束', type: 'end' as const, protocol: '', config: {}, position: { x: 250, y: 400 } },
     ];
+    try {
     await createFlow({ name: newName, description: newDesc, nodes: defaultNodes, edges: [] });
     setShowCreate(false);
     setNewName('');
     setNewDesc('');
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'Failed to create flow';
+      toast.error(msg);
+    }
   };
 
   return (

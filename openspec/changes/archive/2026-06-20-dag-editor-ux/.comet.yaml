@@ -1,0 +1,23 @@
+workflow: full
+phase: archive
+context_compression: off
+build_mode: subagent-driven-development
+build_pause: null
+subagent_dispatch: confirmed
+tdd_mode: direct
+review_mode: off
+isolation: branch
+verify_mode: full
+auto_transition: true
+base_ref: eb4595479655878b53cc60363259e640f4b3a669
+design_doc: docs/superpowers/specs/2026-06-20-dag-editor-ux-design.md
+plan: docs/superpowers/plans/2026-06-20-dag-editor-ux.md
+verify_result: pass
+verification_report: docs/superpowers/reports/2026-06-20-dag-editor-ux-verify.md
+branch_status: handled
+created_at: 2026-06-20
+verified_at: 2026-06-20
+archived: true
+handoff_context: openspec/changes/dag-editor-ux/.comet/handoff/design-context.json
+handoff_hash: 7cd054cd704b7d98ee1311f0da0d079d484d02ceca1895e10d2bcca8ebc4ca3d
+build_command: GOCACHE=/tmp/gocache go build -C backend ./...

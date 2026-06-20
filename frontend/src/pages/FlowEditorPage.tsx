@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from '../store/toastStore';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   useNodesState,
@@ -11,7 +12,7 @@ import '@xyflow/react/dist/style.css';
 import { ArrowLeft, Save, Play, Settings, GitBranch, Circle, Square, Plus } from 'lucide-react';
 import { DAGViewer } from '../components/dag';
 import { useFlowStore, useExecutionStore } from '../store';
-import { flowApi, protocolApi } from '../api/client';
+import { flowApi, protocolApi, ApiError } from '../api/client';
 import type { FlowNode as FlowNodeType, Protocol, ConfigField, NodeInput } from '../types';
 import {
   flowNodesToReactFlow,
@@ -52,7 +53,10 @@ export default function FlowEditorPage() {
   const [protocols, setProtocols] = useState<Protocol[]>([]);
 
   useEffect(() => {
-    if (id) loadFlow(Number(id));
+    if (id) loadFlow(Number(id)).catch((e) => {
+      const msg = e instanceof ApiError ? e.message : 'Failed to load flow';
+      toast.error(msg);
+    });
   }, [id, loadFlow]);
 
   useEffect(() => {
@@ -179,6 +183,10 @@ export default function FlowEditorPage() {
         edges: updatedEdges,
       });
       loadFlow(currentFlow.id);
+      toast.success('Flow saved');
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'Failed to save flow';
+      toast.error(msg);
     } finally {
       setSaving(false);
     }

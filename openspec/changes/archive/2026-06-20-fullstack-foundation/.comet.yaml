@@ -1,0 +1,23 @@
+workflow: full
+phase: archive
+context_compression: off
+build_mode: executing-plans
+build_pause: null
+subagent_dispatch: null
+tdd_mode: tdd
+review_mode: off
+isolation: branch
+verify_mode: full
+auto_transition: true
+base_ref: d790d4f0a6b34f4e9451b19c3e4ab1a229b4d506
+design_doc: openspec/changes/fullstack-foundation/.comet/handoff/design-doc.md
+plan: null
+verify_result: pass
+verification_report: docs/superpowers/reports/2026-06-19-fullstack-foundation-verify.md
+branch_status: handled
+created_at: 2026-06-19
+verified_at: 2026-06-20
+archived: true
+handoff_context: openspec/changes/fullstack-foundation/.comet/handoff/design-context.json
+handoff_hash: 66dcc44e2058157b12672a55d81f1f162c6458095127c474e5d18dbe3808a2f3
+build_command: GOCACHE=/tmp/gocache go build -C backend ./...

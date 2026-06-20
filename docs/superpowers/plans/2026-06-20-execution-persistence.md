@@ -2,6 +2,7 @@
 change: execution-persistence
 design-doc: docs/superpowers/specs/2026-06-20-execution-persistence-design.md
 base-ref: 2640703b00c5ffafafedbe0c808b96e8f49126b8
+archived-with: 2026-06-20-execution-persistence
 ---
 
 # Implementation Plan: Execution Persistence

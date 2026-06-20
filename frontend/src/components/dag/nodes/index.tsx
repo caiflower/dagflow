@@ -47,7 +47,7 @@ function EndNode({ data }: NodeProps<Node<BaseNodeData>>) {
 function TaskNode({ data }: NodeProps<Node<BaseNodeData>>) {
   const colors = getNodeTypeColor('task');
   const protocol = (data.protocol as string) || '';
-  const IconComp = getProtocolLucideIcon(protocol);
+  const IconComp = protocol ? getProtocolLucideIcon(protocol) : Settings;
   return (
     <BaseNode
       data={data}
@@ -57,7 +57,7 @@ function TaskNode({ data }: NodeProps<Node<BaseNodeData>>) {
         data.config && Object.keys(data.config).length > 0 ? (
           <div className="text-[10px] space-y-0.5">
             {Object.entries(data.config).slice(0, 3).map(([k, v]) => (
-              <div key={k} className="truncate">
+              <div key={k} className="text-[10px] px-1 py-0.5 rounded bg-[var(--bg-tertiary)] truncate">
                 <span style={{ color: 'var(--text-muted)' }}>{k}:</span>{' '}
                 <span style={{ color: 'var(--text-secondary)' }}>{String(v).slice(0, 20)}</span>
               </div>

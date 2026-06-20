@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/caiflower/common-tools/web/common/e"
+
 	"github.com/caiflower/common-tools/pkg/basic"
 	"github.com/caiflower/common-tools/pkg/bean"
 	"github.com/caiflower/common-tools/pkg/logger"
@@ -61,24 +63,24 @@ type RunFlowReq struct {
 func (s *ExecutionService) Run(ctx context.Context, req *RunFlowReq) (*Execution, error) {
 	flow, err := s.FlowDAO.GetByID(ctx, req.FlowID)
 	if err != nil {
-		return nil, fmt.Errorf("flow not found: %w", err)
+		return nil, e.NewApiError(e.NotFound, fmt.Sprintf("flow %d not found", req.FlowID), err)
 	}
 
 	// 解析节点和边
 	flowNodes, flowEdges, err := converter.ParseFlowJSON(flow)
 	if err != nil {
-		return nil, fmt.Errorf("parse flow: %w", err)
+		return nil, e.NewApiError(e.InvalidArgument, err.Error(), err)
 	}
 
 	// 构建 taskx.Task
 	task, err := converter.FlowToTask(flow, createProvider, req.NodeInputs)
 	if err != nil {
-		return nil, fmt.Errorf("build task: %w", err)
+		return nil, e.NewApiError(e.InvalidArgument, err.Error(), err)
 	}
 
 	// 编译 DAG
 	if _, err := task.Compile(); err != nil {
-		return nil, fmt.Errorf("compile task: %w", err)
+		return nil, e.NewApiError(e.InvalidArgument, err.Error(), err)
 	}
 
 	// 标记为紧急任务
@@ -86,7 +88,7 @@ func (s *ExecutionService) Run(ctx context.Context, req *RunFlowReq) (*Execution
 
 	// 提交到 taskx
 	if err := taskx.SubmitTask(ctx, task); err != nil {
-		return nil, fmt.Errorf("submit task: %w", err)
+		return nil, e.NewApiError(e.Internal, err.Error(), err)
 	}
 
 	// 写入执行记录映射表
@@ -125,7 +127,7 @@ func (s *ExecutionService) GetStatus(ctx context.Context, execID string) (*Execu
 	// 1. 从执行记录表查 task_id
 	record, err := s.ExecutionRecordDAO.GetByID(ctx, execID)
 	if err != nil {
-		return nil, fmt.Errorf("execution %s not found: %w", execID, err)
+		return nil, e.NewApiError(e.NotFound, fmt.Sprintf("execution %s not found", execID), err)
 	}
 	if record == nil || record.FlowID == 0 {
 		return nil, fmt.Errorf("execution %s not found", execID)

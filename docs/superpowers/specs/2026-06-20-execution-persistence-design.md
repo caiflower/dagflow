@@ -3,6 +3,8 @@ comet_change: execution-persistence
 date: 2026-06-20
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-20-execution-persistence
+status: final
 ---
 
 # Design: Execution Persistence

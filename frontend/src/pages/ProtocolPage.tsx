@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { toast } from '../store/toastStore';
+import { ApiError } from '../api/client';
 import { Plug, Globe, Radio, Terminal, Link, Settings } from 'lucide-react';
 import { useProtocolStore } from '../store';
 import Badge from '../components/ui/Badge';
@@ -12,7 +14,12 @@ const protocolIcons: Record<string, React.ComponentType<{ size?: number; style?:
 
 export default function ProtocolPage() {
   const { protocols, loadProtocols } = useProtocolStore();
-  useEffect(() => { loadProtocols(); }, [loadProtocols]);
+  useEffect(() => { 
+    loadProtocols().catch((e) => {
+      const msg = e instanceof ApiError ? e.message : 'Failed to load protocols';
+      toast.error(msg);
+    });
+  }, [loadProtocols]);
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">

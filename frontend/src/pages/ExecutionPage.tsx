@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
+import { toast } from '../store/toastStore';
 import { Play, Zap, Clock, ChevronDown, ChevronRight, ChevronLeft, Terminal, Globe, Search, X, Filter } from 'lucide-react';
 import { useExecutionStore } from '../store';
 import { useFlowStore } from '../store';
-import { flowApi, executionApi } from '../api/client';
+import { flowApi, executionApi, ApiError } from '../api/client';
 import type { FlowNode, NodeInput, Execution, NodeStatus } from '../types';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -158,8 +159,9 @@ export default function ExecutionPage() {
       if (exec.state === 'running' || exec.state === 'pending') {
         pollExecution(exec.id);
       }
-    } catch {
-      setSearchError('未找到执行记录: ' + id);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'Failed to load execution';
+      toast.error(msg);
     }
   };
 
@@ -185,7 +187,9 @@ export default function ExecutionPage() {
         setFlowNodes([]);
       }
       setNodeInputs({});
-    }).catch(() => {
+    }).catch((e) => {
+      const msg = e instanceof ApiError ? e.message : 'Failed to load flow';
+      toast.error(msg);
       setFlowNodes([]);
     });
   }, [selectedFlowId]);
@@ -198,6 +202,9 @@ export default function ExecutionPage() {
         .filter(([, v]) => v.trim() !== '')
         .map(([nodeName, input]) => ({ node_name: nodeName, input }));
       await runFlow(selectedFlowId, inputs.length > 0 ? inputs : undefined);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'Failed to run flow';
+      toast.error(msg);
     } finally {
       setRunning(false);
     }

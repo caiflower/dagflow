@@ -16,3 +16,15 @@ CREATE TABLE IF NOT EXISTS "flow" (
 
 CREATE INDEX IF NOT EXISTS idx_flow_name ON "flow" ("name");
 CREATE INDEX IF NOT EXISTS idx_flow_status ON "flow" ("status");
+
+-- 创建 execution_record 表（执行记录映射）
+CREATE TABLE IF NOT EXISTS "execution_record" (
+    "id"         TEXT    NOT NULL PRIMARY KEY,
+    "flow_id"    INTEGER NOT NULL,
+    "flow_name"  TEXT    NOT NULL,
+    "task_id"    TEXT    NOT NULL,
+    "created_at" TEXT    NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_er_flow_id ON "execution_record" ("flow_id");
+CREATE INDEX IF NOT EXISTS idx_er_task_id ON "execution_record" ("task_id");

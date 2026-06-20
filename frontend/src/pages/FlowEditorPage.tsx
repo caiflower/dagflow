@@ -61,8 +61,8 @@ export default function FlowEditorPage() {
 
   useEffect(() => {
     if (!currentFlow) return;
-    const flowNodes = parseNodesJSON(currentFlow.nodesJSON);
-    const flowEdges = parseEdgesJSON(currentFlow.edgesJSON);
+    const flowNodes = parseNodesJSON(currentFlow.nodes_json);
+    const flowEdges = parseEdgesJSON(currentFlow.edges_json);
     const hasPosition = flowNodes.some((n) => n.position && (n.position.x !== 0 || n.position.y !== 0));
     const laid = hasPosition ? flowNodes : autoLayout(flowNodes, flowEdges);
     setNodes(flowNodesToReactFlow(laid));
@@ -190,7 +190,7 @@ export default function FlowEditorPage() {
     try {
       const inputs: NodeInput[] = Object.entries(runNodeInputs)
         .filter(([, v]) => v.trim() !== '')
-        .map(([nodeName, input]) => ({ nodeName, input }));
+        .map(([nodeName, input]) => ({ node_name: nodeName, input }));
       await runFlow(currentFlow.id, inputs.length > 0 ? inputs : undefined);
       setShowRunModal(false);
       setRunNodeInputs({});
@@ -451,7 +451,7 @@ function NodePropsPanel({ node, protocols, protocolSchema, onUpdate, onDelete, o
               <option value="">选择协议...</option>
               {protocols.map((p) => (
                 <option key={p.name} value={p.name}>
-                  {p.displayName || p.name}
+                  {p.display_name || p.name}
                 </option>
               ))}
             </select>
@@ -462,12 +462,12 @@ function NodePropsPanel({ node, protocols, protocolSchema, onUpdate, onDelete, o
         )}
 
         {/* Config fields */}
-        {isEditable && protocolSchema && protocolSchema.configSchema?.fields.length > 0 && (
+        {isEditable && protocolSchema && protocolSchema.config_schema?.fields.length > 0 && (
           <div className="space-y-3">
             <div className="text-[11px] font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
               配置参数
             </div>
-            {protocolSchema.configSchema.fields.map((field: ConfigField) => (
+            {protocolSchema.config_schema.fields.map((field: ConfigField) => (
               <ConfigFieldInput
                 key={field.name}
                 field={field}

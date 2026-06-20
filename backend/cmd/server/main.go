@@ -155,6 +155,7 @@ func initDB() {
 	tables := []interface{}{
 		// dagflow 业务表
 		(*model.Flow)(nil),
+		(*dao.ExecutionRecord)(nil),
 		// taskx 任务调度表
 		(*taskxModel.Task)(nil),
 		(*taskxModel.Subtask)(nil),
@@ -174,6 +175,7 @@ func initDB() {
 
 	// 初始化 DAO
 	dao.Init()
+	dao.InitExecutionRecord()
 
 	logger.Info("database initialized successfully")
 }

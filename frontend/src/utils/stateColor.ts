@@ -49,6 +49,7 @@ export const stateBadgeVariant: Record<string, 'success' | 'danger' | 'warning' 
   succeeded: 'success',
   failed:    'danger',
   skipped:   'default',
+  archived:  'warning',
 };
 
 /** 启用/禁用 Badge 变体 */

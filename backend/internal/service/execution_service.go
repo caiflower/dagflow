@@ -3,17 +3,18 @@ package service
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/caiflower/common-tools/pkg/basic"
 	"github.com/caiflower/common-tools/pkg/bean"
 	"github.com/caiflower/common-tools/pkg/logger"
+	"github.com/caiflower/common-tools/pkg/tools"
 
 	"github.com/caiflower/dagflow/internal/converter"
 	"github.com/caiflower/dagflow/internal/model/dao"
 	"github.com/caiflower/dagflow/taskx"
 	taskxDAO "github.com/caiflower/dagflow/taskx/dao"
+	taskxModel "github.com/caiflower/dagflow/taskx/dao/model"
 )
 
 // Execution 执行记录
@@ -21,31 +22,33 @@ type Execution struct {
 	ID        string       `json:"id"`
 	FlowID    int64        `json:"flowID"`
 	FlowName  string       `json:"flowName"`
-	State     string       `json:"state"` // pending, running, succeeded, failed
+	State     string       `json:"state"` // pending, running, succeeded, failed, archived
 	StartTime basic.Time   `json:"startTime"`
 	EndTime   basic.Time   `json:"endTime"`
 	Nodes     []NodeStatus `json:"nodes"`
-
-	// 内部字段
-	taskID   string            // taskx Task ID
-	nodeInfo map[string]string // name → nodeType (start/end/task/branch)
+	TaskID    string       `json:"taskID"` // taskx Task ID
 }
 
 // NodeStatus 节点执行状态
 type NodeStatus struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	State string `json:"state"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	State      string `json:"state"`
+	Input      string `json:"input"`
+	Output     string `json:"output"`
+	StartTime  string `json:"startTime"`
+	EndTime    string `json:"endTime"`
+	DurationMs int64  `json:"durationMs"`
+	NodeType   string `json:"nodeType"` // task, branch, start, end
+	Protocol   string `json:"protocol"` // http, grpc, local, mcp
 }
 
 // ExecutionService 执行管理服务
 type ExecutionService struct {
-	FlowDAO    *dao.FlowDAO        `autowired:""`
-	TaskDAO    taskxDAO.TaskDAO    `autowired:""`
-	SubtaskDAO taskxDAO.SubtaskDAO `autowired:""`
-
-	mu         sync.RWMutex
-	executions map[string]*Execution
+	FlowDAO            *dao.FlowDAO            `autowired:""`
+	ExecutionRecordDAO *dao.ExecutionRecordDAO `autowired:""`
+	TaskDAO            taskxDAO.TaskDAO        `autowired:""`
+	SubtaskDAO         taskxDAO.SubtaskDAO     `autowired:""`
 }
 
 // RunFlowReq 执行 Flow 请求
@@ -61,167 +64,292 @@ func (s *ExecutionService) Run(ctx context.Context, req *RunFlowReq) (*Execution
 		return nil, fmt.Errorf("flow not found: %w", err)
 	}
 
-	// 解析节点和边（用于构建 Execution 记录）
-	flowNodes, _, err := converter.ParseFlowJSON(flow)
+	// 解析节点和边
+	flowNodes, flowEdges, err := converter.ParseFlowJSON(flow)
 	if err != nil {
 		return nil, fmt.Errorf("parse flow: %w", err)
 	}
 
-	// 使用 FlowToTask 构建 taskx.Task，使用 createProvider 作为 provider 工厂
+	// 构建 taskx.Task
 	task, err := converter.FlowToTask(flow, createProvider, req.NodeInputs)
 	if err != nil {
 		return nil, fmt.Errorf("build task: %w", err)
 	}
 
-	// 编译 DAG（校验环、起始/终止节点等）
+	// 编译 DAG
 	if _, err := task.Compile(); err != nil {
 		return nil, fmt.Errorf("compile task: %w", err)
 	}
 
-	// 标记为紧急任务，提交后立即调度
+	// 标记为紧急任务
 	task.SetUrgent()
 
-	// 提交到 taskx（持久化到 DB，触发集群调度）
+	// 提交到 taskx
 	if err := taskx.SubmitTask(ctx, task); err != nil {
 		return nil, fmt.Errorf("submit task: %w", err)
 	}
 
+	// 写入执行记录映射表
 	execID := fmt.Sprintf("exec-%d-%d", flow.ID, time.Now().UnixMilli())
-	now := basic.NewFromTime(time.Now())
-
-	// 构建节点信息（name → type 映射 + 初始状态）
-	nodeInfo := make(map[string]string)
-	var nodes []NodeStatus
-	for _, n := range flowNodes {
-		nodeInfo[n.Name] = n.Type
-		state := "pending"
-		if n.Type == "start" {
-			state = "succeeded" // start 节点视为立即成功
-		}
-		nodes = append(nodes, NodeStatus{
-			ID:    n.ID,
-			Name:  n.Name,
-			State: state,
-		})
+	now := time.Now()
+	record := &dao.ExecutionRecord{
+		ID:        execID,
+		FlowID:    flow.ID,
+		FlowName:  flow.Name,
+		TaskID:    task.GetID(),
+		CreatedAt: now,
+	}
+	if err := s.ExecutionRecordDAO.Insert(ctx, record); err != nil {
+		logger.Error("failed to insert execution record: %v", err)
+		// 不阻塞返回，记录已提交到 taskx
 	}
 
+	// 构建返回结果
+	nodes := buildNodeStatuses(flowNodes, flowEdges, nil, nil)
 	exec := &Execution{
 		ID:        execID,
 		FlowID:    flow.ID,
 		FlowName:  flow.Name,
 		State:     "running",
-		StartTime: now,
+		StartTime: basic.NewFromTime(now),
 		Nodes:     nodes,
-		taskID:    task.GetID(),
-		nodeInfo:  nodeInfo,
+		TaskID:    task.GetID(),
 	}
-
-	s.mu.Lock()
-	if s.executions == nil {
-		s.executions = make(map[string]*Execution)
-	}
-	s.executions[execID] = exec
-	s.mu.Unlock()
 
 	logger.Info("execution %s submitted, taskID=%s, flow=%s", execID, task.GetID(), flow.Name)
 	return exec, nil
 }
 
-// GetStatus 查询执行状态（从 taskx DB 查询真实状态）
+// GetStatus 查询执行状态（从 DB + taskx 实时查询）
 func (s *ExecutionService) GetStatus(ctx context.Context, execID string) (*Execution, error) {
-	s.mu.RLock()
-	exec, ok := s.executions[execID]
-	s.mu.RUnlock()
-	if !ok {
+	// 1. 从执行记录表查 task_id
+	record, err := s.ExecutionRecordDAO.GetByID(ctx, execID)
+	if err != nil {
+		return nil, fmt.Errorf("execution %s not found: %w", execID, err)
+	}
+	if record == nil || record.FlowID == 0 {
 		return nil, fmt.Errorf("execution %s not found", execID)
 	}
 
-	// 查询 taskx Task 状态
-	taskModel, err := s.TaskDAO.GetByID(ctx, exec.taskID)
+	// 2. 查询 Flow 定义（获取节点类型和协议信息）
+	flow, err := s.FlowDAO.GetByID(ctx, record.FlowID)
 	if err != nil {
-		// DB 查询失败，返回内存中的状态
-		return s.snapshot(exec), nil
+		return s.buildArchivedExecution(record), nil
+	}
+	flowNodes, flowEdges, _ := converter.ParseFlowJSON(flow)
+
+	// 3. 查询 taskx Task 状态
+	taskModel, err := s.TaskDAO.GetByID(ctx, record.TaskID)
+	if err != nil || taskModel == nil {
+		// taskx 任务不存在，降级为 archived
+		return s.buildArchivedExecution(record), nil
 	}
 
-	// 查询所有 Subtask 状态
-	subtasks, err := s.SubtaskDAO.GetByTaskID(ctx, exec.taskID)
+	// 4. 查询所有 Subtask 状态
+	subtasks, err := s.SubtaskDAO.GetByTaskID(ctx, record.TaskID)
 	if err != nil {
-		return s.snapshot(exec), nil
+		subtasks = nil
 	}
 
-	// 构建 subtask name → state 映射
-	subtaskStates := make(map[string]string)
-	for _, st := range subtasks {
-		subtaskStates[st.TaskName] = mapTaskxState(st.State)
-	}
-
-	// 构建返回结果
-	snapshot := s.snapshot(exec)
-	snapshot.State = mapTaskxState(taskModel.State)
-
-	// 更新节点状态
-	for i := range snapshot.Nodes {
-		node := &snapshot.Nodes[i]
-		nodeType := exec.nodeInfo[node.Name]
-		if nodeType == "start" || nodeType == "end" {
-			// start/end 节点：如果所有 task 节点都完成，end 也标记为 succeeded
-			if nodeType == "end" && snapshot.State == "succeeded" {
-				node.State = "succeeded"
-			}
-			continue
-		}
-		if st, ok := subtaskStates[node.Name]; ok {
-			node.State = st
-		}
+	// 5. 组装返回结果
+	exec := &Execution{
+		ID:        record.ID,
+		FlowID:    record.FlowID,
+		FlowName:  record.FlowName,
+		State:     mapTaskxState(taskModel.State),
+		StartTime: basic.NewFromTime(record.CreatedAt),
+		TaskID:    record.TaskID,
 	}
 
 	// 设置结束时间
-	if snapshot.State == "succeeded" || snapshot.State == "failed" {
-		if snapshot.EndTime.IsZero() {
-			snapshot.EndTime = basic.NewFromTime(time.Now())
-			// 更新内存中的 EndTime
-			s.mu.Lock()
-			exec.EndTime = snapshot.EndTime
-			exec.State = snapshot.State
-			s.mu.Unlock()
+	if exec.State == "succeeded" || exec.State == "failed" {
+		if !taskModel.LastRunTime.IsZero() {
+			exec.EndTime = taskModel.LastRunTime
 		}
 	}
 
-	return snapshot, nil
+	// 构建节点状态
+	exec.Nodes = buildNodeStatuses(flowNodes, flowEdges, subtasks, taskModel)
+
+	return exec, nil
 }
 
-// ListExecutions 列出所有执行记录
-func (s *ExecutionService) ListExecutions(ctx context.Context) []*Execution {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+// ListExecutions 列出执行记录（分页，支持按 flowID 筛选）
+func (s *ExecutionService) ListExecutions(ctx context.Context, page, pageSize int, flowID int64) ([]*Execution, int, error) {
+	records, total, err := s.ExecutionRecordDAO.List(ctx, page, pageSize, flowID)
+	if err != nil {
+		logger.Error("failed to list execution records: %v", err)
+		return nil, 0, err
+	}
+	if len(records) == 0 {
+		return []*Execution{}, total, nil
+	}
 
-	result := make([]*Execution, 0, len(s.executions))
-	for _, exec := range s.executions {
-		result = append(result, s.snapshotUnsafe(exec))
+	// 批量查询 taskx Task 状态
+	taskIDs := make([]string, 0, len(records))
+	for _, r := range records {
+		taskIDs = append(taskIDs, r.TaskID)
+	}
+	tasks, _ := s.TaskDAO.GetByIDs(ctx, taskIDs)
+	taskMap := make(map[string]*taskxModel.Task, len(tasks))
+	for i := range tasks {
+		taskMap[tasks[i].ID] = &tasks[i]
+	}
+
+	// 组装返回结果
+	result := make([]*Execution, 0, len(records))
+	for _, r := range records {
+		t := taskMap[r.TaskID]
+		state := "archived"
+		var endTime basic.Time
+		if t != nil {
+			state = mapTaskxState(t.State)
+			if state == "succeeded" || state == "failed" {
+				if !t.LastRunTime.IsZero() {
+					endTime = t.LastRunTime
+				}
+			}
+		}
+		result = append(result, &Execution{
+			ID:        r.ID,
+			FlowID:    r.FlowID,
+			FlowName:  r.FlowName,
+			State:     state,
+			StartTime: basic.NewFromTime(r.CreatedAt),
+			EndTime:   endTime,
+			TaskID:    r.TaskID,
+		})
+	}
+	return result, total, nil
+}
+
+// buildArchivedExecution 构建 archived 状态的执行记录
+func (s *ExecutionService) buildArchivedExecution(record *dao.ExecutionRecord) *Execution {
+	return &Execution{
+		ID:        record.ID,
+		FlowID:    record.FlowID,
+		FlowName:  record.FlowName,
+		State:     "archived",
+		StartTime: basic.NewFromTime(record.CreatedAt),
+		TaskID:    record.TaskID,
+	}
+}
+
+// buildNodeStatuses 从 Flow 节点定义和 taskx Subtask 状态组装 NodeStatus 列表（按 DAG 拓扑序输出）
+func buildNodeStatuses(flowNodes []converter.FlowNode, flowEdges []converter.FlowEdge, subtasks []taskxModel.Subtask, taskModel *taskxModel.Task) []NodeStatus {
+	// 拓扑排序：保证节点按 DAG 顺序输出
+	sorted := topoSort(flowNodes, flowEdges)
+
+	// 构建 subtask name → state 映射
+	subtaskMap := make(map[string]*taskxModel.Subtask, len(subtasks))
+	for i := range subtasks {
+		subtaskMap[subtasks[i].TaskName] = &subtasks[i]
+	}
+
+	nodes := make([]NodeStatus, 0, len(sorted))
+	for _, fn := range sorted {
+		ns := NodeStatus{
+			ID:       fn.ID,
+			Name:     fn.Name,
+			State:    "pending",
+			NodeType: fn.Type,
+			Protocol: fn.Protocol,
+		}
+
+		// start 节点视为立即成功
+		if fn.Type == "start" {
+			ns.State = "succeeded"
+		}
+
+		// 从 taskx Subtask 获取状态和详情
+		if st, ok := subtaskMap[fn.Name]; ok {
+			ns.State = mapTaskxState(st.State)
+			ns.Input = st.Input
+
+			// 解析 Output JSON（taskx 存储格式: {"output":"...","err":"..."}）
+			if st.Output != "" {
+				var output taskx.Output
+				if err := tools.Unmarshal([]byte(st.Output), &output); err == nil {
+					if output.Err != "" {
+						ns.Output = output.Err
+					} else {
+						ns.Output = output.Output
+					}
+				} else {
+					ns.Output = st.Output
+				}
+			}
+
+			// 时间信息
+			if !st.LastRunTime.IsZero() {
+				ns.StartTime = st.LastRunTime.String()
+				// 如果节点已终态，用 task 级别的 LastRunTime 近似 endTime
+				if (ns.State == "succeeded" || ns.State == "failed") && taskModel != nil && !taskModel.LastRunTime.IsZero() {
+					ns.EndTime = taskModel.LastRunTime.String()
+					startMs := st.LastRunTime.Time().UnixMilli()
+					endMs := taskModel.LastRunTime.Time().UnixMilli()
+					if endMs > startMs {
+						ns.DurationMs = endMs - startMs
+					}
+				}
+			}
+		}
+
+		// end 节点：如果整体任务成功，end 也标记为 succeeded
+		if fn.Type == "end" && taskModel != nil && mapTaskxState(taskModel.State) == "succeeded" {
+			ns.State = "succeeded"
+		}
+
+		nodes = append(nodes, ns)
+	}
+	return nodes
+}
+
+// topoSort 对 flowNodes 按 DAG 边做拓扑排序（Kahn 算法），无法排序时回退原序
+func topoSort(flowNodes []converter.FlowNode, flowEdges []converter.FlowEdge) []converter.FlowNode {
+	if len(flowNodes) == 0 {
+		return flowNodes
+	}
+	// 构建 node id → index 映射
+	idxMap := make(map[string]int, len(flowNodes))
+	for i, n := range flowNodes {
+		idxMap[n.ID] = i
+	}
+	// 入度 + 邻接表
+	inDegree := make([]int, len(flowNodes))
+	adj := make([][]int, len(flowNodes))
+	for _, e := range flowEdges {
+		src, ok1 := idxMap[e.Source]
+		dst, ok2 := idxMap[e.Target]
+		if ok1 && ok2 {
+			adj[src] = append(adj[src], dst)
+			inDegree[dst]++
+		}
+	}
+	// BFS
+	queue := make([]int, 0, len(flowNodes))
+	for i, d := range inDegree {
+		if d == 0 {
+			queue = append(queue, i)
+		}
+	}
+	result := make([]converter.FlowNode, 0, len(flowNodes))
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		result = append(result, flowNodes[cur])
+		for _, next := range adj[cur] {
+			inDegree[next]--
+			if inDegree[next] == 0 {
+				queue = append(queue, next)
+			}
+		}
+	}
+	// 如果拓扑排序未覆盖所有节点（有环），回退原序
+	if len(result) < len(flowNodes) {
+		return flowNodes
 	}
 	return result
-}
-
-// snapshot 返回执行记录的快照（带锁保护）
-func (s *ExecutionService) snapshot(exec *Execution) *Execution {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.snapshotUnsafe(exec)
-}
-
-// snapshotUnsafe 返回执行记录的快照（调用者需持有读锁）
-func (s *ExecutionService) snapshotUnsafe(exec *Execution) *Execution {
-	snap := &Execution{
-		ID:        exec.ID,
-		FlowID:    exec.FlowID,
-		FlowName:  exec.FlowName,
-		State:     exec.State,
-		StartTime: exec.StartTime,
-		EndTime:   exec.EndTime,
-		Nodes:     make([]NodeStatus, len(exec.Nodes)),
-	}
-	copy(snap.Nodes, exec.Nodes)
-	return snap
 }
 
 // mapTaskxState 将 taskx 状态映射为前端可展示的状态

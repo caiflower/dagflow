@@ -71,15 +71,17 @@ interface ExecutionStore {
   executions: Execution[];
   currentExec: Execution | null;
   loading: boolean;
+  total: number;
   runFlow: (flowId: number, nodeInputs?: NodeInput[]) => Promise<Execution>;
   pollExecution: (id: string) => Promise<void>;
-  loadExecutions: () => Promise<void>;
+  loadExecutions: (page?: number, pageSize?: number, flowId?: number) => Promise<void>;
 }
 
 export const useExecutionStore = create<ExecutionStore>((set, get) => ({
   executions: [],
   currentExec: null,
   loading: false,
+  total: 0,
 
   runFlow: async (flowId: number, nodeInputs?: NodeInput[]) => {
     const exec = await executionApi.run(flowId, nodeInputs);
@@ -104,11 +106,11 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
     setTimeout(poll, 1000);
   },
 
-  loadExecutions: async () => {
+  loadExecutions: async (page = 1, pageSize = 20, flowId?: number) => {
     set({ loading: true });
     try {
-      const executions = await executionApi.list();
-      set({ executions: executions || [] });
+      const result = await executionApi.list(page, pageSize, flowId);
+      set({ executions: result.items || [], total: result.total || 0 });
     } finally {
       set({ loading: false });
     }

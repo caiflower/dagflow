@@ -4,12 +4,12 @@ export interface Flow {
   id: number;
   name: string;
   description: string;
-  nodesJSON: string;
-  edgesJSON: string;
+  nodes_json: string;
+  edges_json: string;
   version: number;
   status: number;
-  createTime: string;
-  updateTime: string;
+  create_time: string;
+  update_time: string;
 }
 
 export interface FlowNode {
@@ -31,9 +31,9 @@ export interface FlowEdge {
 
 export interface Protocol {
   name: string;
-  displayName: string;
+  display_name: string;
   description: string;
-  configSchema: {
+  config_schema: {
     fields: ConfigField[];
   };
 }
@@ -49,24 +49,32 @@ export interface ConfigField {
 }
 
 export interface NodeInput {
-  nodeName: string;
+  node_name: string;
   input: string;
 }
 
 export interface Execution {
   id: string;
-  flowID: number;
-  flowName: string;
-  state: 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
-  startTime: string;
-  endTime: string;
+  flow_id: number;
+  flow_name: string;
+  state: 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped' | 'archived';
+  start_time: string;
+  end_time: string;
   nodes: NodeStatus[];
+  task_id: string;
 }
 
 export interface NodeStatus {
   id: string;
   name: string;
   state: string;
+  input: string;
+  output: string;
+  start_time: string;
+  end_time: string;
+  duration_ms: number;
+  node_type: string;
+  protocol: string;
 }
 
 export interface PageResult<T> {

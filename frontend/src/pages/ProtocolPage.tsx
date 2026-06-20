@@ -53,7 +53,7 @@ export default function ProtocolPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    {p.displayName}
+                    {p.display_name}
                   </h3>
                   <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{p.name}</span>
                 </div>
@@ -62,7 +62,7 @@ export default function ProtocolPage() {
               <div>
                 <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>配置字段</span>
                 <div className="flex flex-wrap gap-1.5 mt-2">
-                  {p.configSchema.fields.map((f) => (
+                  {p.config_schema.fields.map((f) => (
                     <Badge key={f.name} variant={f.required ? 'subtle' : 'default'}>
                       {f.label}
                       <span className="opacity-60">({f.type})</span>

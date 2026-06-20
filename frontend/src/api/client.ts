@@ -18,9 +18,9 @@ function toProtoNode(n: FlowNode) {
     name: n.name,
     type: n.type,
     protocol: n.protocol,
-    configJSON: n.config ? JSON.stringify(n.config) : '',
-    positionX: n.position?.x ?? 0,
-    positionY: n.position?.y ?? 0,
+    config_json: n.config ? JSON.stringify(n.config) : '',
+    position_x: n.position?.x ?? 0,
+    position_y: n.position?.y ?? 0,
   };
 }
 
@@ -31,7 +31,7 @@ function toProtoEdge(e: FlowEdge) {
 // Flow API
 export const flowApi = {
   list: (page = 1, pageSize = 20, name = '') =>
-    api.get('/flows', { params: { page, pageSize, name } }).then(r => unwrap<PageResult<Flow>>(r)),
+    api.get('/flows', { params: { page, page_size: pageSize, name } }).then(r => unwrap<PageResult<Flow>>(r)),
   get: (id: number) =>
     api.get(`/flows/${id}`).then(r => unwrap<{ flow: Flow }>(r).flow),
   create: (data: { name: string; description: string; nodes: FlowNode[]; edges: FlowEdge[] }) =>
@@ -67,13 +67,13 @@ export const protocolApi = {
 export const executionApi = {
   run: (flowId: number, nodeInputs?: NodeInput[]) =>
     api.post('/executions/run', {
-      flowID: flowId,
-      nodeInputs: nodeInputs || [],
+      flow_id: flowId,
+      node_inputs: nodeInputs || [],
     }).then(r => unwrap<{ execution: Execution }>(r).execution),
   get: (id: string) =>
     api.get(`/executions/${id}`).then(r => unwrap<{ execution: Execution }>(r).execution),
-  list: () =>
-    api.get('/executions').then(r => unwrap<{ items: Execution[] }>(r).items),
+  list: (page = 1, pageSize = 20, flowId?: number) =>
+    api.get('/executions', { params: { page, page_size: pageSize, ...(flowId ? { flow_id: flowId } : {}) } }).then(r => unwrap<PageResult<Execution>>(r)),
 };
 
 export default api;

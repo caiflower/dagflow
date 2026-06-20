@@ -16,3 +16,15 @@ CREATE TABLE IF NOT EXISTS `flow` (
     INDEX idx_name (`name`),
     INDEX idx_status (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+-- 创建 execution_record 表（执行记录映射，execID→taskID 索引）
+CREATE TABLE IF NOT EXISTS `execution_record` (
+    `id`         VARCHAR(64)  NOT NULL                COMMENT '执行记录 ID',
+    `flow_id`    BIGINT       NOT NULL                COMMENT 'Flow ID',
+    `flow_name`  VARCHAR(128) NOT NULL                COMMENT 'Flow 名称',
+    `task_id`    VARCHAR(64)  NOT NULL                COMMENT 'taskx Task ID',
+    `created_at` DATETIME     NOT NULL                COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    INDEX idx_flow_id (`flow_id`),
+    INDEX idx_task_id (`task_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

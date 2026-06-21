@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/caiflower/common-tools/web/common/e"
+	"github.com/caiflower/dagflow/internal/dao"
+	"github.com/caiflower/dagflow/internal/dao/model"
 
 	"github.com/caiflower/common-tools/pkg/basic"
 	"github.com/caiflower/common-tools/pkg/bean"
@@ -13,7 +15,6 @@ import (
 	"github.com/caiflower/common-tools/pkg/tools"
 
 	"github.com/caiflower/dagflow/internal/converter"
-	"github.com/caiflower/dagflow/internal/model/dao"
 	"github.com/caiflower/dagflow/taskx"
 	taskxDAO "github.com/caiflower/dagflow/taskx/dao"
 	taskxModel "github.com/caiflower/dagflow/taskx/dao/model"
@@ -94,7 +95,7 @@ func (s *ExecutionService) Run(ctx context.Context, req *RunFlowReq) (*Execution
 	// 写入执行记录映射表
 	execID := tools.GenerateId("exec")
 	now := time.Now()
-	record := &dao.ExecutionRecord{
+	record := &model.ExecutionRecord{
 		ID:        execID,
 		FlowID:    flow.ID,
 		FlowName:  flow.Name,
@@ -226,7 +227,7 @@ func (s *ExecutionService) ListExecutions(ctx context.Context, page, pageSize in
 }
 
 // buildArchivedExecution 构建 archived 状态的执行记录
-func (s *ExecutionService) buildArchivedExecution(record *dao.ExecutionRecord) *Execution {
+func (s *ExecutionService) buildArchivedExecution(record *model.ExecutionRecord) *Execution {
 	return &Execution{
 		ID:        record.ID,
 		FlowID:    record.FlowID,

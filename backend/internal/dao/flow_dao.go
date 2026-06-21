@@ -21,8 +21,7 @@ import (
 
 	dbv1 "github.com/caiflower/common-tools/db/v1"
 	"github.com/caiflower/common-tools/pkg/bean"
-
-	"github.com/caiflower/dagflow/internal/model"
+	"github.com/caiflower/dagflow/internal/dao/model"
 )
 
 // FlowDAO Flow 数据访问对象

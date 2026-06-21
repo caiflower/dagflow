@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/caiflower/dagflow/internal/model"
+	"github.com/caiflower/dagflow/internal/dao/model"
 	"github.com/caiflower/dagflow/taskx"
 	"github.com/caiflower/dagflow/taskx/executor"
 )

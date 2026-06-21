@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/caiflower/dagflow/internal/converter"
-	"github.com/caiflower/dagflow/internal/model"
+	"github.com/caiflower/dagflow/internal/dao/model"
 	pb "github.com/caiflower/dagflow/internal/proto"
 	"github.com/caiflower/dagflow/internal/service"
 )

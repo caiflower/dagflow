@@ -5,6 +5,7 @@ import (
 
 	dbv1 "github.com/caiflower/common-tools/db/v1"
 	"github.com/caiflower/common-tools/pkg/bean"
+	"github.com/caiflower/dagflow/internal/dao/model"
 	"github.com/uptrace/bun"
 )
 
@@ -14,14 +15,14 @@ type ExecutionRecordDAO struct {
 }
 
 // Insert 插入执行记录
-func (d *ExecutionRecordDAO) Insert(ctx context.Context, record *ExecutionRecord) error {
+func (d *ExecutionRecordDAO) Insert(ctx context.Context, record *model.ExecutionRecord) error {
 	_, err := d.DB.GetDB().NewInsert().Model(record).Exec(ctx)
 	return err
 }
 
 // GetByID 根据 ID 查询执行记录
-func (d *ExecutionRecordDAO) GetByID(ctx context.Context, id string) (*ExecutionRecord, error) {
-	record := &ExecutionRecord{}
+func (d *ExecutionRecordDAO) GetByID(ctx context.Context, id string) (*model.ExecutionRecord, error) {
+	record := &model.ExecutionRecord{}
 	err := d.DB.GetDB().NewSelect().
 		Model(record).
 		Where("id = ?", id).
@@ -33,8 +34,8 @@ func (d *ExecutionRecordDAO) GetByID(ctx context.Context, id string) (*Execution
 }
 
 // GetByIDs 批量查询执行记录
-func (d *ExecutionRecordDAO) GetByIDs(ctx context.Context, ids []string) ([]ExecutionRecord, error) {
-	var records []ExecutionRecord
+func (d *ExecutionRecordDAO) GetByIDs(ctx context.Context, ids []string) ([]model.ExecutionRecord, error) {
+	var records []model.ExecutionRecord
 	err := d.DB.GetDB().NewSelect().
 		Model(&records).
 		Where("id IN (?)", bun.In(ids)).
@@ -46,7 +47,7 @@ func (d *ExecutionRecordDAO) GetByIDs(ctx context.Context, ids []string) ([]Exec
 }
 
 // List 查询执行记录列表（按创建时间降序，支持按 flow_id 筛选）
-func (d *ExecutionRecordDAO) List(ctx context.Context, page, pageSize int, flowID string) ([]ExecutionRecord, int, error) {
+func (d *ExecutionRecordDAO) List(ctx context.Context, page, pageSize int, flowID string) ([]model.ExecutionRecord, int, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -59,7 +60,7 @@ func (d *ExecutionRecordDAO) List(ctx context.Context, page, pageSize int, flowI
 	offset := (page - 1) * pageSize
 
 	// 构建查询条件
-	countQuery := d.DB.GetDB().NewSelect().Model((*ExecutionRecord)(nil))
+	countQuery := d.DB.GetDB().NewSelect().Model((*model.ExecutionRecord)(nil))
 	if flowID != "" {
 		countQuery = countQuery.Where("flow_id = ?", flowID)
 	}
@@ -71,7 +72,7 @@ func (d *ExecutionRecordDAO) List(ctx context.Context, page, pageSize int, flowI
 	}
 
 	// 查询分页数据
-	var records []ExecutionRecord
+	var records []model.ExecutionRecord
 	listQuery := d.DB.GetDB().NewSelect().Model(&records)
 	if flowID != "" {
 		listQuery = listQuery.Where("flow_id = ?", flowID)

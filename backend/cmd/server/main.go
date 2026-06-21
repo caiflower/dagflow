@@ -28,11 +28,11 @@ import (
 	"github.com/caiflower/common-tools/pkg/logger"
 	"github.com/caiflower/common-tools/web"
 	"github.com/caiflower/common-tools/web/app/server/config"
+	"github.com/caiflower/dagflow/internal/dao"
+	"github.com/caiflower/dagflow/internal/dao/model"
 
 	"github.com/caiflower/dagflow/constants"
 	"github.com/caiflower/dagflow/internal/api"
-	"github.com/caiflower/dagflow/internal/model"
-	"github.com/caiflower/dagflow/internal/model/dao"
 	"github.com/caiflower/dagflow/internal/protocol"
 	"github.com/caiflower/dagflow/internal/service"
 	"github.com/caiflower/dagflow/taskx"
@@ -155,7 +155,7 @@ func initDB() {
 	tables := []interface{}{
 		// dagflow 业务表
 		(*model.Flow)(nil),
-		(*dao.ExecutionRecord)(nil),
+		(*model.ExecutionRecord)(nil),
 		// taskx 任务调度表
 		(*taskxModel.Task)(nil),
 		(*taskxModel.Subtask)(nil),

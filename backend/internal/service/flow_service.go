@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"github.com/caiflower/common-tools/web/common/e"
+	"github.com/caiflower/dagflow/internal/dao"
+	"github.com/caiflower/dagflow/internal/dao/model"
 
 	"github.com/caiflower/common-tools/pkg/basic"
 	"github.com/caiflower/common-tools/pkg/bean"
 	"github.com/caiflower/common-tools/pkg/tools"
 
 	"github.com/caiflower/dagflow/internal/converter"
-	"github.com/caiflower/dagflow/internal/model"
-	"github.com/caiflower/dagflow/internal/model/dao"
 )
 
 // FlowService Flow 业务逻辑层

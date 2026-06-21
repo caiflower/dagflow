@@ -26,3 +26,10 @@ database:
     maxOpen: 50
     maxIdle: 10
     debug: true
+
+redis:
+  - name: dagflow
+    addrs:
+      - "127.0.0.1:6379"
+    password: ""
+    db: 0

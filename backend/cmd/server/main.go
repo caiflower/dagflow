@@ -18,25 +18,33 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"runtime"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/caiflower/common-tools/cluster"
 	dbv1 "github.com/caiflower/common-tools/db/v1"
 	"github.com/caiflower/common-tools/global"
 	"github.com/caiflower/common-tools/pkg/bean"
 	"github.com/caiflower/common-tools/pkg/logger"
+	v2 "github.com/caiflower/common-tools/redis/v2"
 	"github.com/caiflower/common-tools/web"
 	"github.com/caiflower/common-tools/web/app/server/config"
 	"github.com/caiflower/dagflow/internal/dao"
 	"github.com/caiflower/dagflow/internal/dao/model"
+	"github.com/caiflower/dagflow/internal/node_registry"
+	"github.com/caiflower/dagflow/internal/protocol/remote_executor"
 
 	"github.com/caiflower/dagflow/constants"
 	"github.com/caiflower/dagflow/internal/api"
 	"github.com/caiflower/dagflow/internal/protocol"
 	"github.com/caiflower/dagflow/internal/service"
+	pb "github.com/caiflower/dagflow/proto/remote_executor"
 	"github.com/caiflower/dagflow/taskx"
 	taskxModel "github.com/caiflower/dagflow/taskx/dao/model"
+	"google.golang.org/grpc"
 )
 
 var engine *web.Engine
@@ -49,6 +57,9 @@ var protocolRegistry *protocol.Registry
 
 // dagflowCluster 单节点集群引用
 var dagflowCluster cluster.ICluster
+
+var nodeReg *node_registry.NodeRegistry
+var remotePool *remote_executor.ConnPool
 
 func init() {
 	// 1. 加载配置
@@ -100,6 +111,10 @@ func initBean() {
 	service.Init()
 	// 初始化 ExecutionService
 	service.InitExec()
+
+	// Initialize RemoteExecutor connection pool
+	remotePool = remote_executor.NewConnPool()
+	service.SetRemoteExecutorPool(remotePool)
 }
 
 // initGrpcServices 创建 gRPC 服务实例并设置到 API 层
@@ -110,6 +125,69 @@ func initGrpcServices() {
 	api.SetFlowGrpcService(api.NewFlowGrpcService(flowSvc))
 	api.SetProtocolGrpcService(api.NewProtocolGrpcService(protocolRegistry))
 	api.SetExecutionGrpcService(api.NewExecutionGrpcService(execSvc))
+
+	// Initialize NodeRegistry with Redis client from config
+	var redisClient v2.RedisClient
+	if constants.Prop.RedisEmbedded {
+		mr, err := miniredis.Run()
+		if err != nil {
+			logger.Error("failed to start embedded miniredis: %v", err)
+			panic(err)
+		}
+		redisClient, err = v2.NewRedisClient(v2.Config{
+			Addrs: []string{mr.Addr()},
+		})
+		if err != nil {
+			logger.Error("failed to create embedded Redis client: %v", err)
+			panic(err)
+		}
+		global.DefaultResourceManger.Add(mr)
+
+		logger.Info("NodeRegistry using embedded miniredis at %s", mr.Addr())
+	} else {
+		redisCfg := constants.DefaultConfig.GetRedisConfigByName("dagflow")
+		if redisCfg == nil {
+			panic("redis config 'dagflow' not found in default.yaml")
+		}
+		var err error
+		redisClient, err = v2.NewRedisClient(*redisCfg)
+		if err != nil {
+			logger.Error("failed to create Redis client: %v", err)
+			panic(err)
+		}
+		logger.Info("NodeRegistry initialized with Redis at %v", redisCfg.Addrs)
+	}
+
+	nodeReg = node_registry.NewNodeRegistry(redisClient)
+	service.SetNodeRegistry(nodeReg)
+
+	// Start NodeRegistry gRPC server
+	if nodeReg != nil {
+		startNodeRegistryServer()
+	}
+}
+
+func startNodeRegistryServer() {
+	port := constants.Prop.GRPC.NodeRegistryPort
+	if port == 0 {
+		port = 50051
+	}
+
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		logger.Error("failed to listen on NodeRegistry port %d: %v", port, err)
+		return
+	}
+
+	s := grpc.NewServer()
+	pb.RegisterNodeRegistryServer(s, nodeReg)
+
+	go func() {
+		logger.Info("NodeRegistry gRPC server listening on :%d", port)
+		if err := s.Serve(lis); err != nil {
+			logger.Error("NodeRegistry gRPC server error: %v", err)
+		}
+	}()
 }
 
 // initWeb 创建 Web 引擎并注册路由

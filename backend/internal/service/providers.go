@@ -11,8 +11,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/caiflower/dagflow/internal/node_registry"
+	remote_executor2 "github.com/caiflower/dagflow/internal/protocol/remote_executor"
 	"github.com/caiflower/dagflow/taskx/executor"
 )
+
+var nodeRegistry *node_registry.NodeRegistry
+var remoteExecutorPool *remote_executor2.ConnPool
+
+func SetNodeRegistry(r *node_registry.NodeRegistry) {
+	nodeRegistry = r
+}
+
+func SetRemoteExecutorPool(p *remote_executor2.ConnPool) {
+	remoteExecutorPool = p
+}
 
 // createProvider 根据协议和配置创建执行器
 func createProvider(protocol string, config map[string]any) (executor.ExecutorProvider, error) {
@@ -23,6 +36,18 @@ func createProvider(protocol string, config map[string]any) (executor.ExecutorPr
 		return newHTTPProvider(config)
 	case "grpc":
 		return &stubProvider{protocol: protocol}, nil
+	case "remoteFunc":
+		funcName, _ := config["funcName"].(string)
+		timeout := 30 * time.Second
+		if t, ok := config["timeout"].(float64); ok && t > 0 {
+			timeout = time.Duration(t) * time.Second
+		}
+		return &remote_executor2.RemoteFuncProvider{
+			FuncName: funcName,
+			Timeout:  timeout,
+			Registry: nodeRegistry,
+			Pool:     remoteExecutorPool,
+		}, nil
 	case "mcp":
 		return &stubProvider{protocol: protocol}, nil
 	default:

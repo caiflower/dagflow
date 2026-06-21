@@ -9,6 +9,7 @@ export const nodeTypeColorMap: Record<string, { bg: string; border: string; text
   end:    { bg: '#3a1010', border: '#ff3b30', text: '#fecaca' },
   task:   { bg: '#0a2a4a', border: '#2997ff', text: '#bfdbfe' },
   branch: { bg: '#3a2a00', border: '#ff9f0a', text: '#fef3c7' },
+  remoteFunc: { bg: '#1a1a2e', border: '#7b68ee', text: '#d4ccff' },
 };
 
 /** 节点运行状态颜色 */
@@ -63,6 +64,7 @@ export const protocolIconMap: Record<string, string> = {
   grpc:  'Radio',
   local: 'Terminal',
   mcp:   'Link',
+  remoteFunc: 'Radio',
 };
 
 /** 获取协议图标名称（带 fallback） */

@@ -4,17 +4,17 @@
  */
 import { memo } from 'react';
 import type { NodeProps, Node } from '@xyflow/react';
-import { Play, Square, Settings, GitBranch, Globe, Radio, Terminal, Link } from 'lucide-react';
+import { Play, Square, Settings, GitBranch, Globe, Radio, Terminal, Link, RadioTower } from 'lucide-react';
 import BaseNode, { type BaseNodeData } from './BaseNode';
 import { getNodeTypeColor } from '../../../utils/stateColor';
 
 const lucideIcons: Record<string, React.ComponentType<{ size?: number; style?: React.CSSProperties }>> = {
-  Globe, Radio, Terminal, Link, Settings,
+  Globe, Radio, Terminal, Link, Settings, RadioTower,
 };
 
 function getProtocolLucideIcon(protocol: string) {
   const iconMap: Record<string, string> = {
-    http: 'Globe', grpc: 'Radio', local: 'Terminal', mcp: 'Link',
+    http: 'Globe', grpc: 'Radio', local: 'Terminal', mcp: 'Link', remoteFunc: 'RadioTower',
   };
   return lucideIcons[iconMap[protocol] || 'Settings'] || Settings;
 }

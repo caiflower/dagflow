@@ -110,4 +110,5 @@ func RegisterBuiltinProtocols(registry *Registry) {
 	registry.Register(&GRPCProtocol{})
 	registry.Register(&LocalProtocol{})
 	registry.Register(&MCPProtocol{})
+	registry.Register(&RemoteFuncProtocol{})
 }

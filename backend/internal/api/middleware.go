@@ -18,7 +18,6 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/caiflower/common-tools/pkg/logger"
@@ -45,19 +44,19 @@ func requestLogMiddleware(c context.Context, ctx *app.RequestContext) {
 	ctx.Next(c)
 	duration := time.Since(start)
 
-	logger.Info(fmt.Sprintf("[HTTP] %s %s %d %s",
+	logger.Info("[HTTP] %s %s %d %s",
 		ctx.GetMethod(),
 		ctx.GetPath(),
 		ctx.GetStatusCode(),
 		duration.String(),
-	))
+	)
 }
 
 // recoveryMiddleware 错误恢复中间件
 func recoveryMiddleware(c context.Context, ctx *app.RequestContext) {
 	defer func() {
 		if err := recover(); err != nil {
-			logger.Error(fmt.Sprintf("[PANIC] %s %s: %v", ctx.GetMethod(), ctx.GetPath(), err))
+			logger.Error("[PANIC] %s %s: %v", ctx.GetMethod(), ctx.GetPath(), err)
 			ctx.AbortWithMsg("Internal Server Error", 500)
 		}
 	}()

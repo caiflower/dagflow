@@ -1,0 +1,38 @@
+syntax = "proto3";
+package dagflow.remote_executor;
+option go_package = "github.com/caiflower/dagflow/proto/remote_executor";
+
+service RemoteExecutor {
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+  rpc HealthCheck(HealthRequest) returns (HealthResponse);
+}
+
+message ExecuteRequest {
+  string func_name = 1;
+  bytes input = 2;
+  string task_id = 3;
+}
+
+message ExecuteResponse {
+  bytes output = 1;
+  string error = 2;
+}
+
+message HealthRequest {}
+message HealthResponse { bool ok = 1; }
+
+service NodeRegistry {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+}
+
+message RegisterRequest {
+  string node_id = 1;
+  string address = 2;
+  repeated string functions = 3;
+}
+
+message RegisterResponse { bool ok = 1; }
+
+message HeartbeatRequest { string node_id = 1; }
+message HeartbeatResponse { bool ok = 1; }

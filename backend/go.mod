@@ -1,6 +1,6 @@
 module github.com/caiflower/dagflow
 
-go 1.24.0
+go 1.24
 
 toolchain go1.24.1
 
@@ -93,3 +93,61 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	mellium.im/sasl v0.3.2 // indirect
 )
+
+exclude google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8
+
+exclude google.golang.org/genproto v0.0.0-20190307195333-5fe7a883aa19
+
+exclude google.golang.org/genproto v0.0.0-20190418145605-e7d98fc518a7
+
+exclude google.golang.org/genproto v0.0.0-20190425155659-357c62f0e4bb
+
+exclude google.golang.org/genproto v0.0.0-20190502173448-54afdca5d873
+
+exclude google.golang.org/genproto v0.0.0-20190801165951-fa694d86fc64
+
+exclude google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
+
+exclude google.golang.org/genproto v0.0.0-20190911173649-1774047e7e51
+
+exclude google.golang.org/genproto v0.0.0-20191108220845-16a3f7862a1a
+
+exclude google.golang.org/genproto v0.0.0-20191115194625-c23dd37a84c9
+
+exclude google.golang.org/genproto v0.0.0-20191216164720-4f79533eabd1
+
+exclude google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb
+
+exclude google.golang.org/genproto v0.0.0-20200115191322-ca5a22157cba
+
+exclude google.golang.org/genproto v0.0.0-20200122232147-0452cf42e150
+
+exclude google.golang.org/genproto v0.0.0-20200204135345-fa8e72b47b90
+
+exclude google.golang.org/genproto v0.0.0-20200212174721-66ed5ce911ce
+
+exclude google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63
+
+exclude google.golang.org/genproto v0.0.0-20200228133532-8c2c7df3a383
+
+exclude google.golang.org/genproto v0.0.0-20200305110556-506484158171
+
+exclude google.golang.org/genproto v0.0.0-20200312145019-da6875a35672
+
+exclude google.golang.org/genproto v0.0.0-20200331122359-1ee6d9798940
+
+exclude google.golang.org/genproto v0.0.0-20200430143042-b979b6f78d84
+
+exclude google.golang.org/genproto v0.0.0-20200511104702-f5ebc3bea380
+
+exclude google.golang.org/genproto v0.0.0-20200515170657-fc4c6c6a6587
+
+exclude google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
+
+exclude google.golang.org/genproto v0.0.0-20200618031413-b414f8b61790
+
+exclude google.golang.org/genproto v0.0.0-20200729003335-053ba62fc06f
+
+exclude google.golang.org/genproto v0.0.0-20200804131852-c06518451d9c
+
+exclude google.golang.org/genproto v0.0.0-20200825200019-8632dd797987

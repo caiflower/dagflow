@@ -20,12 +20,19 @@ import (
 	"github.com/caiflower/common-tools/global/config"
 )
 
-// DefaultConfig 基础设施配置（由 etc/default.yaml 加载）
+// DefaultConfig 基础设施配置（由 etc/default.yaml 加载，含 redis 字段）
 var DefaultConfig config.DefaultConfig
 
 // Config 业务配置（由 etc/config.yaml 加载）
 type Config struct {
-	GoMaxProcs int `yaml:"go_max_procs" json:"go_max_procs"`
+	GoMaxProcs    int        `yaml:"go_max_procs" json:"go_max_procs"`
+	RedisEmbedded bool       `yaml:"redis_embedded" json:"redis_embedded"`
+	GRPC          GRPCConfig `yaml:"grpc" json:"grpc"`
+}
+
+// GRPCConfig gRPC 服务配置
+type GRPCConfig struct {
+	NodeRegistryPort int `yaml:"node_registry_port" json:"node_registry_port"`
 }
 
 // Prop 业务配置实例

@@ -1,7 +1,7 @@
 // DAGFlow 类型定义
 
 export interface Flow {
-  id: number;
+  id: string;
   name: string;
   description: string;
   nodes_json: string;
@@ -55,7 +55,7 @@ export interface NodeInput {
 
 export interface Execution {
   id: string;
-  flow_id: number;
+  flow_id: string;
   flow_name: string;
   state: 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped' | 'archived';
   start_time: string;

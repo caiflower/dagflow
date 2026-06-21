@@ -11,7 +11,7 @@ import (
 type ExecutionRecord struct {
 	bun.BaseModel `bun:"table:execution_record"`
 	ID            string    `bun:"id,pk" json:"id"`
-	FlowID        int64     `bun:"flow_id,notnull" json:"flowID"`
+	FlowID        string    `bun:"flow_id,notnull" json:"flowID"`
 	FlowName      string    `bun:"flow_name,notnull" json:"flowName"`
 	TaskID        string    `bun:"task_id,notnull" json:"taskID"`
 	CreatedAt     time.Time `bun:"created_at,notnull" json:"createdAt"`

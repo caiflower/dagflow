@@ -46,7 +46,7 @@ function toProtoEdge(e: FlowEdge) {
 export const flowApi = {
   list: (page = 1, pageSize = 20, name = '') =>
     api.get('/flows', { params: { page, page_size: pageSize, name } }).then(r => unwrap<PageResult<Flow>>(r)),
-  get: (id: number) =>
+  get: (id: string) =>
     api.get(`/flows/${id}`).then(r => unwrap<{ flow: Flow }>(r).flow),
   create: (data: { name: string; description: string; nodes: FlowNode[]; edges: FlowEdge[] }) =>
     api.post('/flows', {
@@ -54,13 +54,13 @@ export const flowApi = {
       nodes: data.nodes.map(toProtoNode),
       edges: data.edges.map(toProtoEdge),
     }).then(r => unwrap<{ flow: Flow }>(r).flow),
-  update: (data: { id: number; name?: string; description?: string; nodes?: FlowNode[]; edges?: FlowEdge[] }) =>
+  update: (data: { id: string; name?: string; description?: string; nodes?: FlowNode[]; edges?: FlowEdge[] }) =>
     api.put(`/flows/${data.id}`, {
       ...data,
       nodes: data.nodes?.map(toProtoNode),
       edges: data.edges?.map(toProtoEdge),
     }).then(r => unwrap<{ flow: Flow }>(r).flow),
-  delete: (id: number) =>
+  delete: (id: string) =>
     api.delete(`/flows/${id}`).then(r => unwrap<{ status: string }>(r)),
   validate: (nodes: FlowNode[], edges: FlowEdge[]) =>
     api.post('/flows/validate', {
@@ -79,14 +79,14 @@ export const protocolApi = {
 
 // Execution API
 export const executionApi = {
-  run: (flowId: number, nodeInputs?: NodeInput[]) =>
+  run: (flowId: string, nodeInputs?: NodeInput[]) =>
     api.post('/executions/run', {
       flow_id: flowId,
       node_inputs: nodeInputs || [],
     }).then(r => unwrap<{ execution: Execution }>(r).execution),
   get: (id: string) =>
     api.get(`/executions/${id}`).then(r => unwrap<{ execution: Execution }>(r).execution),
-  list: (page = 1, pageSize = 20, flowId?: number) =>
+  list: (page = 1, pageSize = 20, flowId?: string) =>
     api.get('/executions', { params: { page, page_size: pageSize, ...(flowId ? { flow_id: flowId } : {}) } }).then(r => unwrap<PageResult<Execution>>(r)),
 };
 

@@ -34,7 +34,7 @@ message FlowEdge {
 }
 
 message Flow {
-  int64 id = 1;
+  string id = 1;
   string name = 2;
   string description = 3;
   string nodes_json = 4;
@@ -54,7 +54,7 @@ message CreateFlowRequest {
 
 message GetFlowRequest {
   // @gotags: path:"id"
-  int64 id = 1;
+  string id = 1;
 }
 
 message ListFlowRequest {
@@ -73,7 +73,7 @@ message ListFlowResponse {
 
 message UpdateFlowRequest {
   // @gotags: path:"id"
-  int64 id = 1;
+  string id = 1;
   string name = 2;
   string description = 3;
   repeated FlowNode nodes = 4;
@@ -82,7 +82,7 @@ message UpdateFlowRequest {
 
 message DeleteFlowRequest {
   // @gotags: path:"id"
-  int64 id = 1;
+  string id = 1;
 }
 
 message DeleteFlowResponse {
@@ -169,7 +169,7 @@ message NodeStatus {
 
 message Execution {
   string id = 1;
-  int64 flow_id = 2;
+  string flow_id = 2;
   string flow_name = 3;
   string state = 4;
   string start_time = 5;
@@ -184,7 +184,7 @@ message NodeInput {
 }
 
 message RunFlowRequest {
-  int64 flow_id = 1;
+  string flow_id = 1;
   repeated NodeInput node_inputs = 2;
 }
 
@@ -199,7 +199,7 @@ message ListExecutionRequest {
   // @gotags: query:"page_size"
   int32 page_size = 2;
   // @gotags: query:"flow_id"
-  int64 flow_id = 3;
+  string flow_id = 3;
 }
 
 message ExecutionResponse {

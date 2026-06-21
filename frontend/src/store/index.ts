@@ -8,9 +8,9 @@ interface FlowStore {
   currentFlow: Flow | null;
   loading: boolean;
   loadFlows: (page?: number, name?: string) => Promise<void>;
-  loadFlow: (id: number) => Promise<void>;
+  loadFlow: (id: string) => Promise<void>;
   createFlow: (data: { name: string; description: string; nodes: FlowNode[]; edges: FlowEdge[] }) => Promise<Flow>;
-  deleteFlow: (id: number) => Promise<void>;
+  deleteFlow: (id: string) => Promise<void>;
   setCurrentFlow: (flow: Flow | null) => void;
 }
 
@@ -30,7 +30,7 @@ export const useFlowStore = create<FlowStore>((set) => ({
     }
   },
 
-  loadFlow: async (id: number) => {
+  loadFlow: async (id: string) => {
     set({ loading: true });
     try {
       const flow = await flowApi.get(id);
@@ -46,7 +46,7 @@ export const useFlowStore = create<FlowStore>((set) => ({
     return flow;
   },
 
-  deleteFlow: async (id: number) => {
+  deleteFlow: async (id: string) => {
     await flowApi.delete(id);
     set((s) => ({ flows: s.flows.filter((f) => f.id !== id) }));
   },
@@ -72,9 +72,9 @@ interface ExecutionStore {
   currentExec: Execution | null;
   loading: boolean;
   total: number;
-  runFlow: (flowId: number, nodeInputs?: NodeInput[]) => Promise<Execution>;
+  runFlow: (flowId: string, nodeInputs?: NodeInput[]) => Promise<Execution>;
   pollExecution: (id: string) => Promise<void>;
-  loadExecutions: (page?: number, pageSize?: number, flowId?: number) => Promise<void>;
+  loadExecutions: (page?: number, pageSize?: number, flowId?: string) => Promise<void>;
 }
 
 export const useExecutionStore = create<ExecutionStore>((set, get) => ({
@@ -83,7 +83,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
   loading: false,
   total: 0,
 
-  runFlow: async (flowId: number, nodeInputs?: NodeInput[]) => {
+  runFlow: async (flowId: string, nodeInputs?: NodeInput[]) => {
     const exec = await executionApi.run(flowId, nodeInputs);
     set((s) => ({ executions: [exec, ...s.executions], currentExec: exec }));
     // Start polling
@@ -106,7 +106,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
     setTimeout(poll, 1000);
   },
 
-  loadExecutions: async (page = 1, pageSize = 20, flowId?: number) => {
+  loadExecutions: async (page = 1, pageSize = 20, flowId?: string) => {
     set({ loading: true });
     try {
       const result = await executionApi.list(page, pageSize, flowId);

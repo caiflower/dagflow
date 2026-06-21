@@ -31,7 +31,7 @@ type FlowDAO struct {
 }
 
 // GetByID 根据 ID 查询 Flow
-func (d *FlowDAO) GetByID(ctx context.Context, id int64) (*model.Flow, error) {
+func (d *FlowDAO) GetByID(ctx context.Context, id string) (*model.Flow, error) {
 	flow := &model.Flow{ID: id}
 	err := d.DB.GetDB().NewSelect().
 		Model(flow).
@@ -48,8 +48,9 @@ func (d *FlowDAO) List(ctx context.Context, filter *model.FlowFilter) ([]model.F
 }
 
 // Insert 创建 Flow
-func (d *FlowDAO) Insert(ctx context.Context, flow *model.Flow) (int64, error) {
-	return d.DB.Insert(ctx, flow)
+func (d *FlowDAO) Insert(ctx context.Context, flow *model.Flow) (string, error) {
+	_, err := d.DB.Insert(ctx, flow)
+	return flow.ID, err
 }
 
 // Update 更新 Flow
@@ -62,7 +63,7 @@ func (d *FlowDAO) Update(ctx context.Context, flow *model.Flow) error {
 }
 
 // Delete 删除 Flow（软删除，status=0）
-func (d *FlowDAO) Delete(ctx context.Context, id int64) error {
+func (d *FlowDAO) Delete(ctx context.Context, id string) error {
 	flow := &model.Flow{ID: id, Status: 0}
 	_, err := d.DB.GetDB().NewUpdate().
 		Model(flow).

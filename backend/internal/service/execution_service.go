@@ -22,7 +22,7 @@ import (
 // Execution 执行记录
 type Execution struct {
 	ID        string       `json:"id"`
-	FlowID    int64        `json:"flowID"`
+	FlowID    string       `json:"flowID"`
 	FlowName  string       `json:"flowName"`
 	State     string       `json:"state"` // pending, running, succeeded, failed, archived
 	StartTime basic.Time   `json:"startTime"`
@@ -55,7 +55,7 @@ type ExecutionService struct {
 
 // RunFlowReq 执行 Flow 请求
 type RunFlowReq struct {
-	FlowID     int64             `json:"flowId" verf:"required"`
+	FlowID     string            `json:"flowId" verf:"required"`
 	NodeInputs map[string]string `json:"nodeInputs"` // nodeName → JSON input
 }
 
@@ -63,7 +63,7 @@ type RunFlowReq struct {
 func (s *ExecutionService) Run(ctx context.Context, req *RunFlowReq) (*Execution, error) {
 	flow, err := s.FlowDAO.GetByID(ctx, req.FlowID)
 	if err != nil {
-		return nil, e.NewApiError(e.NotFound, fmt.Sprintf("flow %d not found", req.FlowID), err)
+		return nil, e.NewApiError(e.NotFound, fmt.Sprintf("flow %s not found", req.FlowID), err)
 	}
 
 	// 解析节点和边
@@ -92,7 +92,7 @@ func (s *ExecutionService) Run(ctx context.Context, req *RunFlowReq) (*Execution
 	}
 
 	// 写入执行记录映射表
-	execID := fmt.Sprintf("exec-%d-%d", flow.ID, time.Now().UnixMilli())
+	execID := tools.GenerateId("exec")
 	now := time.Now()
 	record := &dao.ExecutionRecord{
 		ID:        execID,
@@ -129,7 +129,7 @@ func (s *ExecutionService) GetStatus(ctx context.Context, execID string) (*Execu
 	if err != nil {
 		return nil, e.NewApiError(e.NotFound, fmt.Sprintf("execution %s not found", execID), err)
 	}
-	if record == nil || record.FlowID == 0 {
+	if record == nil || record.FlowID == "" {
 		return nil, fmt.Errorf("execution %s not found", execID)
 	}
 
@@ -177,7 +177,7 @@ func (s *ExecutionService) GetStatus(ctx context.Context, execID string) (*Execu
 }
 
 // ListExecutions 列出执行记录（分页，支持按 flowID 筛选）
-func (s *ExecutionService) ListExecutions(ctx context.Context, page, pageSize int, flowID int64) ([]*Execution, int, error) {
+func (s *ExecutionService) ListExecutions(ctx context.Context, page, pageSize int, flowID string) ([]*Execution, int, error) {
 	records, total, err := s.ExecutionRecordDAO.List(ctx, page, pageSize, flowID)
 	if err != nil {
 		logger.Error("failed to list execution records: %v", err)

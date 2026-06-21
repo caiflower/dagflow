@@ -24,7 +24,7 @@ import (
 // Flow 工作流定义表
 type Flow struct {
 	bun.BaseModel `bun:"table:flow"`
-	ID            int64      `bun:"id,pk,autoincrement" json:"id"`
+	ID            string     `bun:"id,pk" json:"id"`
 	Name          string     `bun:"name,notnull" json:"name"`
 	Description   string     `bun:"description" json:"description"`
 	NodesJSON     string     `bun:"nodes_json,type:text" json:"nodesJSON"` // 节点定义 JSON

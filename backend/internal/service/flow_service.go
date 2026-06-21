@@ -10,6 +10,7 @@ import (
 
 	"github.com/caiflower/common-tools/pkg/basic"
 	"github.com/caiflower/common-tools/pkg/bean"
+	"github.com/caiflower/common-tools/pkg/tools"
 
 	"github.com/caiflower/dagflow/internal/converter"
 	"github.com/caiflower/dagflow/internal/model"
@@ -31,7 +32,7 @@ type CreateFlowReq struct {
 
 // UpdateFlowReq 更新 Flow 请求
 type UpdateFlowReq struct {
-	ID          int64                `json:"id" verf:"required"`
+	ID          string               `json:"id" verf:"required"`
 	Name        string               `json:"name"`
 	Description string               `json:"description"`
 	Nodes       []converter.FlowNode `json:"nodes"`
@@ -52,6 +53,7 @@ func (s *FlowService) Create(ctx context.Context, req *CreateFlowReq) (*model.Fl
 	}
 
 	flow := &model.Flow{
+		ID:          tools.GenerateId("f"),
 		Name:        req.Name,
 		Description: req.Description,
 		NodesJSON:   converter.NodesToJSON(req.Nodes),
@@ -62,19 +64,17 @@ func (s *FlowService) Create(ctx context.Context, req *CreateFlowReq) (*model.Fl
 		UpdateTime:  basic.NewFromTime(time.Now()),
 	}
 
-	id, err := s.FlowDAO.Insert(ctx, flow)
-	if err != nil {
+	if _, err := s.FlowDAO.Insert(ctx, flow); err != nil {
 		return nil, fmt.Errorf("insert flow: %w", err)
 	}
-	flow.ID = id
 	return flow, nil
 }
 
 // Get 查询单个 Flow
-func (s *FlowService) Get(ctx context.Context, id int64) (*model.Flow, error) {
+func (s *FlowService) Get(ctx context.Context, id string) (*model.Flow, error) {
 	flow, err := s.FlowDAO.GetByID(ctx, id)
 	if err != nil {
-		return nil, e.NewApiError(e.NotFound, fmt.Sprintf("flow %d not found", id), err)
+		return nil, e.NewApiError(e.NotFound, fmt.Sprintf("flow %s not found", id), err)
 	}
 	return flow, nil
 }
@@ -93,7 +93,7 @@ func (s *FlowService) List(ctx context.Context, req *ListFlowReq) ([]model.Flow,
 func (s *FlowService) Update(ctx context.Context, req *UpdateFlowReq) (*model.Flow, error) {
 	existing, err := s.FlowDAO.GetByID(ctx, req.ID)
 	if err != nil {
-		return nil, e.NewApiError(e.NotFound, fmt.Sprintf("flow %d not found", req.ID), err)
+		return nil, e.NewApiError(e.NotFound, fmt.Sprintf("flow %s not found", req.ID), err)
 	}
 
 	if req.Name != "" {
@@ -121,7 +121,7 @@ func (s *FlowService) Update(ctx context.Context, req *UpdateFlowReq) (*model.Fl
 }
 
 // Delete 删除 Flow（软删除）
-func (s *FlowService) Delete(ctx context.Context, id int64) error {
+func (s *FlowService) Delete(ctx context.Context, id string) error {
 	return s.FlowDAO.Delete(ctx, id)
 }
 

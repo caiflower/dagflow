@@ -137,14 +137,14 @@ export default function ExecutionPage() {
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const [selectedFlowId, setSelectedFlowId] = useState<number | null>(null);
+  const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [flowNodes, setFlowNodes] = useState<FlowNode[]>([]);
   const [nodeInputs, setNodeInputs] = useState<Record<string, string>>({});
   const [expandedExecId, setExpandedExecId] = useState<string | null>(null);
   const [expandedExec, setExpandedExec] = useState<Execution | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [filterFlowId, setFilterFlowId] = useState<number | null>(null);
+  const [filterFlowId, setFilterFlowId] = useState<string | null>(null);
   const [searchId, setSearchId] = useState('');
   const [searchError, setSearchError] = useState('');
 
@@ -262,7 +262,7 @@ export default function ExecutionPage() {
           <Play size={15} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
           <select
             value={selectedFlowId || ''}
-            onChange={(e) => setSelectedFlowId(e.target.value ? Number(e.target.value) : null)}
+            onChange={(e) => setSelectedFlowId(e.target.value ? e.target.value : null)}
             className="px-3 py-2 text-sm rounded-[var(--radius-md)] border outline-none transition-all min-w-[180px]"
             style={{
               background: 'var(--bg-input)',
@@ -352,7 +352,7 @@ export default function ExecutionPage() {
           <Filter size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <select
             value={filterFlowId || ''}
-            onChange={(e) => { setFilterFlowId(e.target.value ? Number(e.target.value) : null); setPage(1); }}
+            onChange={(e) => { setFilterFlowId(e.target.value ? e.target.value : null); setPage(1); }}
             className="px-2.5 py-1.5 text-xs rounded-[var(--radius-sm)] border outline-none transition-all"
             style={{
               background: 'var(--bg-input)',

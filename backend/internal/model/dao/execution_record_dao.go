@@ -46,7 +46,7 @@ func (d *ExecutionRecordDAO) GetByIDs(ctx context.Context, ids []string) ([]Exec
 }
 
 // List 查询执行记录列表（按创建时间降序，支持按 flow_id 筛选）
-func (d *ExecutionRecordDAO) List(ctx context.Context, page, pageSize int, flowID int64) ([]ExecutionRecord, int, error) {
+func (d *ExecutionRecordDAO) List(ctx context.Context, page, pageSize int, flowID string) ([]ExecutionRecord, int, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -60,7 +60,7 @@ func (d *ExecutionRecordDAO) List(ctx context.Context, page, pageSize int, flowI
 
 	// 构建查询条件
 	countQuery := d.DB.GetDB().NewSelect().Model((*ExecutionRecord)(nil))
-	if flowID > 0 {
+	if flowID != "" {
 		countQuery = countQuery.Where("flow_id = ?", flowID)
 	}
 
@@ -73,7 +73,7 @@ func (d *ExecutionRecordDAO) List(ctx context.Context, page, pageSize int, flowI
 	// 查询分页数据
 	var records []ExecutionRecord
 	listQuery := d.DB.GetDB().NewSelect().Model(&records)
-	if flowID > 0 {
+	if flowID != "" {
 		listQuery = listQuery.Where("flow_id = ?", flowID)
 	}
 	err = listQuery.

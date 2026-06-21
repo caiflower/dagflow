@@ -53,7 +53,7 @@ export default function FlowEditorPage() {
   const [protocols, setProtocols] = useState<Protocol[]>([]);
 
   useEffect(() => {
-    if (id) loadFlow(Number(id)).catch((e) => {
+    if (id) loadFlow(id).catch((e) => {
       const msg = e instanceof ApiError ? e.message : 'Failed to load flow';
       toast.error(msg);
     });

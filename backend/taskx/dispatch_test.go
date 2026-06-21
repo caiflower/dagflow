@@ -55,6 +55,8 @@ const (
 	taskNestedBranchName   = "taskNestedBranch_flow"
 	taskBranchProviderName = "taskBranchProvider_flow"
 
+	taskFailedNoRollbackName = "taskFailedNoRollback_flow"
+
 	stepOne   = "stepOne"
 	stepTwo   = "stepTwo"
 	stepThree = "stepThree"
@@ -891,6 +893,39 @@ func submitRollbackCustomTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, 
 
 // ===== 主测试入口 =====
 
+// submitFailedNoRollbackTaskAndCheck tests that a task with a failed subtask
+// but no rollback executor transitions to TaskFailed (not stuck).
+// DAG: one → two(fail, no rollback). No rollback executors configured at all.
+func submitFailedNoRollbackTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, done chan<- struct{}) {
+	task := NewTask(taskFailedNoRollbackName).SetUrgent()
+
+	// one succeeds, two fails — neither has a rollback executor
+	one := NewSubtask(stepOne, executor.NewLocalExecutor(echoInput)).SetInput(map[string]any{"name": stepOne})
+	two := NewSubtask(stepTwo, executor.NewLocalExecutor(failStep)).SetInput(map[string]any{"name": stepTwo})
+
+	_ = task.AddSubtask(one)
+	_ = task.AddSubtask(two)
+	_ = task.AddEdge(one, two)
+
+	_, err := task.Compile()
+	assert.NoError(t, err)
+
+	taskDB, _, subtaskMap := submitAndWait(t, dispatcher, task)
+
+	dbOne := subtaskMap[stepOne]
+	dbTwo := subtaskMap[stepTwo]
+
+	// two should have failed (exhausted retries)
+	assert.Equal(t, string(TaskFailed), dbTwo.State, "stepTwo should be failed")
+	assert.Equal(t, int8(0), dbTwo.Retry, "stepTwo retry should be 0 (exhausted)")
+	assert.Equal(t, string(TaskFailed), taskDB.State, "task should be failed")
+
+	// one should have succeeded (ran before the failure)
+	assert.Equal(t, string(TaskSucceeded), dbOne.State, "stepOne should be succeeded")
+
+	done <- struct{}{}
+}
+
 func submitEdgeTypeDataFlowTask(t *testing.T, dispatcher *taskDispatcher, done chan<- struct{}) {
 	// 测试 Input 预计算：只有 DataEdge / ControlAndDataEdge 传数据，ControlEdge 不传
 	// stepA 用唯一输入 {"from":"fromA"}，其他用 {"from":"initial"}，方便区分数据来源
@@ -1076,7 +1111,7 @@ func TestDisPatchRedis(t *testing.T) {
 		}
 	}
 
-	size := 12
+	size := 13
 	done := make(chan struct{}, size)
 
 	go submitDemoTaskAndCheck(t, dispatcher1, done)
@@ -1091,6 +1126,7 @@ func TestDisPatchRedis(t *testing.T) {
 	go submitNestedBranchTaskAndCheck(t, dispatcher1, done)
 	go submitBranchProviderTaskAndCheck(t, dispatcher1, done)
 	go submitEdgeTypeDataFlowTask(t, dispatcher1, done)
+	go submitFailedNoRollbackTaskAndCheck(t, dispatcher1, done)
 
 	for i := 0; i < size; i++ {
 		<-done
@@ -1137,7 +1173,7 @@ func TestDisPatch(t *testing.T) {
 		}
 	}
 
-	size := 12
+	size := 13
 	done := make(chan struct{}, size)
 
 	go submitDemoTaskAndCheck(t, dispatcher1, done)
@@ -1152,6 +1188,7 @@ func TestDisPatch(t *testing.T) {
 	go submitNestedBranchTaskAndCheck(t, dispatcher1, done)
 	go submitBranchProviderTaskAndCheck(t, dispatcher1, done)
 	go submitEdgeTypeDataFlowTask(t, dispatcher1, done)
+	go submitFailedNoRollbackTaskAndCheck(t, dispatcher1, done)
 
 	for i := 0; i < size; i++ {
 		<-done

@@ -554,26 +554,13 @@ func (t *taskDispatcher) analysisTask(ctx context.Context, task *Task, subtaskMa
 	rollbackTriggered := false
 	hasRetrying := false
 	for _, subtask := range subtaskMap {
-		if subtask.GetState() == string(TaskFailed) && subtask.hasRollbackExecutor() {
+		if subtask.GetState() == string(TaskFailed) {
 			rollbackTriggered = true
 			hasRetrying = subtask.subtask.Retry > 0
 		}
 	}
 
 	if rollbackTriggered && !hasRetrying {
-		// Rollback triggered: set rollback = rollback_pending for all relevant subtasks
-		for _, subtask := range subtaskMap {
-			rb := subtask.getRollback()
-			if rb != string(NoneRollback) && rb != "" {
-				continue // already has a rollback state, do not overwrite
-			}
-			st := subtask.GetState()
-			if (st == string(TaskSucceeded) || st == string(TaskFailed)) && subtask.hasRollbackExecutor() {
-				// Terminal state subtask + has rollback executor -> needs rollback
-				logger.Info("[analysisTask] task=%s set %s rollback=rollback_pending (terminal state=%s)", task.GetID(), subtask.GetID(), st)
-			}
-		}
-
 		// Leaf-first rollback: Task computes leaves internally, dispatcher filters by canExecuteSubtask
 		leafRollbacks := task.LeafRollbackSubtasks()
 		for _, s := range leafRollbacks {

@@ -35,6 +35,40 @@ type FlowEdge struct {
 	Expr   string `json:"expr"` // 条件表达式（分支边）
 }
 
+// branchInfo holds pending branch node data for wiring after all subtasks are created
+type branchInfo struct {
+	node     FlowNode
+	provider executor.ExecutorProvider
+}
+
+// validateBranchProvider checks that a branch provider returns string (ID or taskName)
+func validateBranchProvider(p executor.ExecutorProvider) error {
+	result, err := p.Execute(context.Background(), &executor.TaskData{SubTaskId: "validate"})
+	if err != nil {
+		return fmt.Errorf("branch provider execution failed: %w", err)
+	}
+	if _, ok := result.(string); !ok {
+		return fmt.Errorf("branch provider must return string (ID or taskName), got %T", result)
+	}
+	return nil
+}
+
+// isLocalProvider returns true for providers that can be validated at conversion time
+func isLocalProvider(p executor.ExecutorProvider) bool {
+	proto := p.Protocol()
+	return proto == "local" || proto == "branch" || proto == ""
+}
+
+// isBranchNode checks if a node ID belongs to a branch-type node
+func isBranchNode(nodes []FlowNode, id string) bool {
+	for _, n := range nodes {
+		if n.ID == id && n.Type == "branch" {
+			return true
+		}
+	}
+	return false
+}
+
 // FlowToTask 将 Flow 转换为 taskx.Task
 // providerFactory: 根据协议名和配置创建 ExecutorProvider
 // nodeInputs: 可选的节点输入参数 (nodeName → JSON input)
@@ -43,29 +77,42 @@ func FlowToTask(flow *model.Flow, providerFactory func(protocol string, config m
 	if err != nil {
 		return nil, err
 	}
+	return FlowToTaskWithNodes(flow.Name, nodes, edges, providerFactory, nodeInputs)
+}
 
-	task := taskx.NewTask(flow.Name)
+// FlowToTaskWithNodes creates a taskx.Task directly from nodes and edges (for testing)
+func FlowToTaskWithNodes(name string, nodes []FlowNode, edges []FlowEdge, providerFactory func(string, map[string]any) (executor.ExecutorProvider, error), nodeInputs map[string]string) (*taskx.Task, error) {
+	task := taskx.NewTask(name)
 
-	// 构建子任务映射（task + branch 节点均创建 subtask）
+	var pendingBranches []branchInfo
 	subtaskMap := make(map[string]*taskx.Subtask)
+
 	for _, n := range nodes {
 		if n.Type == "start" || n.Type == "end" {
 			continue
 		}
 
-		var provider executor.ExecutorProvider
 		if n.Type == "branch" {
-			// 分支节点使用透传 provider，仅做路由决策
-			provider = &branchPassthroughProvider{node: n, edges: edges}
-		} else {
-			provider, err = providerFactory(n.Protocol, n.Config)
+			provider, err := providerFactory(n.Protocol, n.Config)
 			if err != nil {
-				return nil, fmt.Errorf("node %s: %w", n.Name, err)
+				return nil, fmt.Errorf("branch node %s: %w", n.Name, err)
 			}
+			// Validate return type for local providers
+			if isLocalProvider(provider) {
+				if err := validateBranchProvider(provider); err != nil {
+					return nil, fmt.Errorf("branch node %s: %w", n.Name, err)
+				}
+			}
+			pendingBranches = append(pendingBranches, branchInfo{node: n, provider: provider})
+			continue
+		}
+
+		provider, err := providerFactory(n.Protocol, n.Config)
+		if err != nil {
+			return nil, fmt.Errorf("node %s: %w", n.Name, err)
 		}
 
 		st := taskx.NewSubtask(n.Name, provider)
-		// 如果用户提供了该节点的输入，设置到 subtask
 		if input, ok := nodeInputs[n.Name]; ok && input != "" {
 			st.SetInput(input)
 		}
@@ -75,12 +122,15 @@ func FlowToTask(flow *model.Flow, providerFactory func(protocol string, config m
 		}
 	}
 
-	// 构建边
+	// Build edges (skip edges involving branch nodes — AddBranch handles wiring)
 	for _, e := range edges {
+		if isBranchNode(nodes, e.Source) || isBranchNode(nodes, e.Target) {
+			continue
+		}
 		src, ok1 := subtaskMap[e.Source]
 		dst, ok2 := subtaskMap[e.Target]
 		if !ok1 || !ok2 {
-			continue // 跳过 start/end 节点的边
+			continue
 		}
 		switch e.Type {
 		case "data":
@@ -91,123 +141,61 @@ func FlowToTask(flow *model.Flow, providerFactory func(protocol string, config m
 			if err := task.AddEdge(src, dst); err != nil {
 				return nil, fmt.Errorf("add edge %s->%s: %w", e.Source, e.Target, err)
 			}
-		default: // control
+		default:
 			if err := task.AddControlEdge(src, dst); err != nil {
 				return nil, fmt.Errorf("add control edge %s->%s: %w", e.Source, e.Target, err)
 			}
 		}
 	}
 
-	// 为分支节点注册 AddBranch
-	for _, n := range nodes {
-		if n.Type != "branch" {
-			continue
+	// Wire branch nodes: create branch subtasks via AddBranch with protocol provider
+	for _, bi := range pendingBranches {
+		// Find predecessors (nodes with edges to this branch node)
+		var predIDs []string
+		for _, e := range edges {
+			if e.Target == bi.node.ID {
+				predIDs = append(predIDs, e.Source)
+			}
 		}
-		branchSt, ok := subtaskMap[n.ID]
-		if !ok {
+		if len(predIDs) == 0 {
 			continue
 		}
 
-		// 收集分支节点的出边目标
-		endNodes := make(map[string]bool)
+		// Find successor names
+		succNames := make(map[string]bool)
 		for _, e := range edges {
-			if e.Source == n.ID {
-				if targetSt, ok := subtaskMap[e.Target]; ok {
-					endNodes[targetSt.GetName()] = true
+			if e.Source == bi.node.ID {
+				succNames[e.Target] = true
+			}
+		}
+		if len(succNames) < 2 {
+			continue
+		}
+
+		// Resolve successor names from target node IDs
+		resolvedEndNodes := make(map[string]bool, len(succNames))
+		for targetID := range succNames {
+			for _, n := range nodes {
+				if n.ID == targetID && n.Type == "task" {
+					resolvedEndNodes[n.Name] = true
+					break
 				}
 			}
 		}
-		if len(endNodes) < 2 {
-			continue // 分支节点至少需要 2 个出边目标
-		}
 
-		// 构建分支条件：基于边的 expr 表达式选择目标
-		branchEdges := collectOutgoingEdges(n.ID, edges)
-		if err := task.AddBranch(branchSt, &taskx.Branch{
-			Condition: makeBranchCondition(branchEdges),
-			EndNodes:  endNodes,
-		}); err != nil {
-			return nil, fmt.Errorf("add branch for %s: %w", n.Name, err)
+		// Create branch for each predecessor
+		for _, predID := range predIDs {
+			predSt, ok := subtaskMap[predID]
+			if !ok {
+				continue
+			}
+			if err := task.AddBranch(predSt, taskx.NewBranch(bi.provider, resolvedEndNodes)); err != nil {
+				return nil, fmt.Errorf("add branch %s: %w", bi.node.Name, err)
+			}
 		}
 	}
 
 	return task, nil
-}
-
-// collectOutgoingEdges 收集节点的出边
-func collectOutgoingEdges(nodeID string, edges []FlowEdge) []FlowEdge {
-	var result []FlowEdge
-	for _, e := range edges {
-		if e.Source == nodeID {
-			result = append(result, e)
-		}
-	}
-	return result
-}
-
-// makeBranchCondition 基于出边创建分支条件函数
-// 当前实现：选择第一个目标（默认分支），后续可扩展 expr 表达式求值
-func makeBranchCondition(outEdges []FlowEdge) func(ctx interface{}, input any) (string, error) {
-	return func(ctx interface{}, input any) (string, error) {
-		// 尝试基于 expr 匹配
-		if input != nil {
-			for _, e := range outEdges {
-				if e.Expr != "" && matchExpr(e.Expr, input) {
-					return e.Target, nil
-				}
-			}
-		}
-		// 默认选择第一个目标
-		if len(outEdges) > 0 {
-			return outEdges[0].Target, nil
-		}
-		return "", fmt.Errorf("branch has no outgoing edges")
-	}
-}
-
-// matchExpr 简单的表达式匹配（后续可扩展为完整的表达式引擎）
-// 当前支持：input 中包含 expr 指定的 key 且值为 truthy 时匹配
-func matchExpr(expr string, input any) bool {
-	m, ok := input.(map[string]any)
-	if !ok {
-		return false
-	}
-	if val, exists := m[expr]; exists {
-		switch v := val.(type) {
-		case bool:
-			return v
-		case string:
-			return v != ""
-		default:
-			return v != nil
-		}
-	}
-	return false
-}
-
-// ===== 分支透传 Provider =====
-
-// branchPassthroughProvider 分支节点执行器
-// 透传输入数据，分支路由决策由 taskx AddBranch 的 Condition 处理
-type branchPassthroughProvider struct {
-	node  FlowNode
-	edges []FlowEdge
-}
-
-func (p *branchPassthroughProvider) Execute(ctx context.Context, data *executor.TaskData) (any, error) {
-	// 透传：将输入原样传递给分支条件判断
-	if data != nil && data.Input != "" {
-		var parsed any
-		if err := json.Unmarshal([]byte(data.Input), &parsed); err == nil {
-			return parsed, nil
-		}
-		return data.Input, nil
-	}
-	return map[string]string{"branch": p.node.Name}, nil
-}
-
-func (p *branchPassthroughProvider) Protocol() executor.Protocol {
-	return "branch"
 }
 
 // ParseFlowJSON 解析 Flow 的节点和边 JSON

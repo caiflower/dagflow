@@ -1,0 +1,19 @@
+workflow: full
+phase: archive
+build_mode: direct
+build_pause: null
+isolation: branch
+verify_mode: null
+base_ref: 81c3ed0efd01bdcc4800fb2d242b50d850f45df8
+design_doc: docs/superpowers/specs/2026-06-22-grpc-server-improvements-design.md
+plan: docs/superpowers/plans/2026-06-22-grpc-server-improvements.md
+verify_result: pass
+verification_report: docs/superpowers/reports/2026-06-22-grpc-server-improvements-verify.md
+branch_status: handled
+created_at: 2026-06-22
+verified_at: 2026-06-22
+archived: true
+handoff_context: openspec/changes/grpc-server-improvements/.comet/handoff/design-context.json
+handoff_hash: c0ba7b3063c202812101a2f3bc9ef650c735c0423e8b4a85c95c24d943a7503c
+direct_override: true
+build_command: cd backend && go build ./cmd/server/

@@ -2,6 +2,8 @@
 comet_change: grpc-server-improvements
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-22-grpc-server-improvements
+status: final
 ---
 
 # gRPC Server Improvements

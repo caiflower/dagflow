@@ -160,9 +160,13 @@ func validateDAG(g *dagGraph) error {
 	return nil
 }
 
-// validateBranches 校验分支目标节点是否存在
+// validateBranches 校验分支子任务节点和目标节点是否存在
 func validateBranches(g *dagGraph) error {
 	for nodeKey, branches := range g.branches {
+		// nodeKey is now the branch subtask node key, which must exist in the graph
+		if _, exists := g.nodes[nodeKey]; !exists {
+			return fmt.Errorf("branch subtask node %s not found in graph", nodeKey)
+		}
 		for _, branch := range branches {
 			for endNode := range branch.EndNodes {
 				if _, exists := g.nodes[endNode]; !exists {

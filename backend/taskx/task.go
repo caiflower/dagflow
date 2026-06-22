@@ -514,6 +514,22 @@ func (t *Task) AddBranch(node *Subtask, branch *Branch) error {
 	return t.dag.AddBranch(node.GetID(), branch)
 }
 
+// hasLegacyBranches returns true if the task uses the old branch model
+// (BranchConfig attached to parent subtask, no dedicated branch subtask rows).
+// This is used to decide whether to use the legacy processBranches() path.
+func (t *Task) hasLegacyBranches() bool {
+	for nodeKey, branches := range t.dag.branches {
+		// In the new model, branch keys start with "branch_"
+		// In the legacy model, branches are keyed by the parent subtask ID
+		if !strings.HasPrefix(nodeKey, "branch_") {
+			if len(branches) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // resolveSubtaskKey resolves a name or ID to the ID used internally by the DAG.
 // If key is already a subtask ID, it is returned directly; otherwise it is looked up by name.
 // If not found, the key is returned as-is (the caller is responsible for subsequent validation).

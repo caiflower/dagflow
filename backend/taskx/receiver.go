@@ -272,6 +272,32 @@ func (t *taskReceiver) execSubtask(bag *SubtaskBag) {
 		return
 	}
 
+	// Check if this is a branch subtask
+	var settings SubtaskSettings
+	isBranch := false
+	if bag.subtask.Settings != "" {
+		if err := tools.Unmarshal([]byte(bag.subtask.Settings), &settings); err == nil && settings.BranchConfig != nil {
+			isBranch = true
+		}
+	}
+
+	if isBranch {
+		// Execute branch condition on this worker node
+		selectedKey, err := executeBranchCondition(
+			bag.task.TaskName,
+			bag.subtask.ID,
+			bag.subtask.Settings,
+			bag.subtask.Input,
+		)
+		if err != nil {
+			t.persistSubtaskOutcome(ctx, bag, "", err)
+		} else {
+			t.persistSubtaskOutcome(ctx, bag, selectedKey, nil)
+		}
+		t.notifyLeader(taskID)
+		return
+	}
+
 	provider := getProvider(bag.task.TaskName, bag.subtask.TaskName)
 	if provider == nil {
 		t.handleExecutorMissing(ctx, bag.task, bag.subtask)

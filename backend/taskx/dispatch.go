@@ -547,7 +547,20 @@ func (t *taskDispatcher) analysisTask(ctx context.Context, task *Task, subtaskMa
 	}
 
 	// Handle branch selection: check completed nodes for branches, execute conditions, and skip unselected branch targets
-	t.processBranches(ctx, task)
+	// Legacy path: only for tasks without dedicated branch subtask rows
+	if task.hasLegacyBranches() {
+		t.processBranches(ctx, task)
+	}
+
+	// New path: process completed branch subtask results
+	for _, subtask := range subtaskMap {
+		if subtask.GetState() == string(TaskSucceeded) && subtask.subtask.Settings != "" {
+			var settings SubtaskSettings
+			if err := tools.Unmarshal([]byte(subtask.subtask.Settings), &settings); err == nil && settings.BranchConfig != nil {
+				t.handleBranchResult(ctx, task, subtask)
+			}
+		}
+	}
 
 	// Determine if rollback is truly triggered: only subtasks with state=failed indicate retries are exhausted and rollback is needed
 	// state=pending + retry>0 means still retrying, rollback should not be triggered
@@ -678,6 +691,46 @@ func (t *taskDispatcher) processBranches(ctx context.Context, task *Task) {
 					}
 					logger.Debug("[processBranches] skipped unselected branch target %s (selected: %s)", endKey, selectedKey)
 				}
+			}
+		}
+	}
+}
+
+// handleBranchResult processes the result of a completed branch subtask.
+// It reads the selected key from the branch output and skips unselected end nodes.
+func (t *taskDispatcher) handleBranchResult(ctx context.Context, task *Task, branchSubtask *Subtask) {
+	var settings SubtaskSettings
+	if err := tools.Unmarshal([]byte(branchSubtask.subtask.Settings), &settings); err != nil {
+		logger.Error("[handleBranchResult] failed to parse branch settings: %v", err)
+		return
+	}
+	if settings.BranchConfig == nil {
+		return
+	}
+
+	// Parse the branch output to get the selected key
+	var output Output
+	if err := tools.Unmarshal([]byte(branchSubtask.subtask.Output), &output); err != nil {
+		logger.Error("[handleBranchResult] failed to parse branch output: %v", err)
+		return
+	}
+
+	selectedKey := output.Output // The selected end node name or ID
+
+	// Skip unselected end nodes
+	for _, endNodeName := range settings.BranchConfig.EndNodes {
+		if endNodeName == selectedKey {
+			continue // This is the selected path, keep it active
+		}
+		// Find the subtask by name and skip it
+		for _, s := range task.subtaskMap {
+			if s.GetName() == endNodeName && s.subtask.State == string(TaskPending) {
+				_ = task.SkipSubtask(s.GetID())
+				if err := t.SubtaskDao.SetOutputAndState(ctx, s.GetID(), "", string(TaskSkipped)); err != nil {
+					logger.Error("[handleBranchResult] failed to skip subtask %s: %v", s.GetID(), err)
+				}
+				logger.Debug("[handleBranchResult] skipped unselected branch target %s (selected: %s)", s.GetID(), selectedKey)
+				break
 			}
 		}
 	}

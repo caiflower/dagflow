@@ -2,6 +2,8 @@
 comet_change: simplify-app-branch-logic
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-22-simplify-app-branch-logic
+status: final
 ---
 
 # Application-Layer Branch Logic Simplification

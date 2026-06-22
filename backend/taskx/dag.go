@@ -375,10 +375,12 @@ func (g *dagGraph) AddBranch(nodeKey string, branch *Branch) error {
 		return err
 	}
 
-	// 添加控制边: branch subtask → 每个目标节点
+	// 添加控制边: branch subtask → 每个目标节点（跳过尚不存在的节点，编译时校验）
 	for endKey := range branch.EndNodes {
-		if err := g.AddEdge(branchKey, endKey, ControlEdge); err != nil {
-			return err
+		if _, exists := g.nodes[endKey]; exists {
+			if err := g.AddEdge(branchKey, endKey, ControlEdge); err != nil {
+				return err
+			}
 		}
 	}
 

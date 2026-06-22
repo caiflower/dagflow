@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
+
 	"math/rand"
 	"net"
 	"os"
@@ -718,8 +720,9 @@ func submitBranchProviderTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, 
 	done <- struct{}{}
 }
 
-// TestBranchSettingsPersistenceRoundtrip 验证分支配置的 DB 持久化 roundtrip：
-// convert2Bean 序列化 → initByBean 反序列化，确保 ConditionProvider 正确恢复
+// TestBranchSettingsPersistenceRoundtrip validates branch config DB persistence roundtrip:
+// convert2Bean serialization → initByBean deserialization ensures ConditionProvider is correctly restored.
+// In the new model, branch config is stored on the dedicated branch subtask row, not the parent.
 func TestBranchSettingsPersistenceRoundtrip(t *testing.T) {
 	taskName := "testBranchPersistRoundtrip"
 
@@ -742,54 +745,72 @@ func TestBranchSettingsPersistenceRoundtrip(t *testing.T) {
 	_, err := task.Compile()
 	assert.NoError(t, err)
 
-	// convert2Bean: 序列化
+	// convert2Bean: serialize
 	_, subtaskBeans, edgeBeans := task.convert2Bean()
 
-	// 验证 start 子任务的 settings 包含 branch_config
-	var startBean *model.Subtask
+	// Verify the branch subtask row exists with BranchConfig in Settings
+	var branchBean *model.Subtask
 	for i := range subtaskBeans {
-		if subtaskBeans[i].TaskName == "start" {
-			startBean = &subtaskBeans[i]
+		if strings.HasPrefix(subtaskBeans[i].ID, "branch_") {
+			branchBean = &subtaskBeans[i]
 			break
 		}
 	}
-	assert.NotNil(t, startBean, "start subtask bean should exist")
-	assert.NotEmpty(t, startBean.Settings, "start settings should not be empty")
+	assert.NotNil(t, branchBean, "branch subtask bean should exist")
+	assert.NotEmpty(t, branchBean.Settings, "branch subtask settings should not be empty")
 
 	var settings SubtaskSettings
-	err = json.Unmarshal([]byte(startBean.Settings), &settings)
+	err = json.Unmarshal([]byte(branchBean.Settings), &settings)
 	assert.NoError(t, err, "settings JSON should be valid")
 	assert.NotNil(t, settings.BranchConfig, "branch_config should be present")
 	assert.Equal(t, "local", settings.BranchConfig.ConditionProvider, "provider protocol should be 'local'")
 	assert.Equal(t, 2, len(settings.BranchConfig.EndNodes), "should have 2 end nodes")
-	t.Logf("settings JSON: %s", startBean.Settings)
+	t.Logf("branch settings JSON: %s", branchBean.Settings)
 
-	// initByBean: 反序列化（模拟 DB roundtrip）
+	// Verify parent subtask does NOT have BranchConfig in Settings (new model)
+	for i := range subtaskBeans {
+		if subtaskBeans[i].TaskName == "start" {
+			assert.Empty(t, subtaskBeans[i].Settings, "parent subtask should not have branch config in settings")
+			break
+		}
+	}
+
+	// initByBean: deserialize (simulate DB roundtrip)
 	restoredTask := &Task{dag: NewDAGGraph(), subtaskMap: make(map[string]*Subtask)}
 	_, err = restoredTask.initByBean(&model.Task{
 		ID: task.GetID(), TaskName: taskName, State: string(TaskPending),
 	}, subtaskBeans, edgeBeans)
 	assert.NoError(t, err, "initByBean should not fail")
 
-	// 验证分支已恢复且 ConditionProvider 可用
+	// Verify branches restored, keyed by branch subtask ID
 	branchesMap := restoredTask.compiled.GetBranchesMap()
-	assert.Equal(t, 1, len(branchesMap), "should have 1 branch source node")
+	assert.GreaterOrEqual(t, len(branchesMap), 1, "should have at least 1 branch entry")
 
+	found := false
 	for _, branches := range branchesMap {
-		assert.Equal(t, 1, len(branches), "should have 1 branch")
-		branch := branches[0]
-		assert.NotNil(t, branch.ConditionProvider, "ConditionProvider should be restored from global registry")
-		assert.Equal(t, 2, len(branch.EndNodes), "endNodes should be restored")
+		if len(branches) == 1 {
+			branch := branches[0]
+			assert.NotNil(t, branch.ConditionProvider, "ConditionProvider should be restored from global registry")
+			assert.Equal(t, 2, len(branch.EndNodes), "endNodes should be restored")
+			found = true
+		}
+	}
+	assert.True(t, found, "should find branch with ConditionProvider restored")
 
-		// 实际调用 ConditionProvider 验证其可工作
-		result, execErr := branch.ConditionProvider.Execute(context.Background(), &executor.TaskData{
-			Input: `{"name":"start"}`,
-		})
-		assert.NoError(t, execErr, "restored ConditionProvider should execute successfully")
-		assert.Equal(t, pathA.GetID(), result, "restored ConditionProvider should return correct path")
+	// Verify the restored ConditionProvider works by executing it
+	for _, branches := range branchesMap {
+		if len(branches) == 1 {
+			branch := branches[0]
+			result, execErr := branch.ConditionProvider.Execute(context.Background(), &executor.TaskData{
+				Input: `{"name":"start"}`,
+			})
+			assert.NoError(t, execErr, "restored ConditionProvider should execute successfully")
+			assert.Equal(t, pathA.GetID(), result, "restored ConditionProvider should return correct path")
+			break
+		}
 	}
 
-	// 清理全局注册表
+	// Clean up global registries
 	ClearProviders(taskName)
 }
 

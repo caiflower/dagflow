@@ -39,9 +39,9 @@ import (
 
 	"github.com/caiflower/dagflow/constants"
 	"github.com/caiflower/dagflow/internal/api"
+	dagflowpb "github.com/caiflower/dagflow/internal/proto"
 	"github.com/caiflower/dagflow/internal/protocol"
 	"github.com/caiflower/dagflow/internal/service"
-	dagflowpb "github.com/caiflower/dagflow/internal/proto"
 	pb "github.com/caiflower/dagflow/proto/remote_executor"
 	"github.com/caiflower/dagflow/taskx"
 	taskxModel "github.com/caiflower/dagflow/taskx/dao/model"
@@ -176,7 +176,14 @@ func (g *GrpcServer) Name() string { return "GrpcServer" }
 
 func (g *GrpcServer) Start() error {
 	logger.Info("gRPC server listening on %s", g.lis.Addr().String())
-	return g.server.Serve(g.lis)
+
+	go func() {
+		if err := g.server.Serve(g.lis); err != nil {
+			logger.Error("failed to start gRPC server: %v", err)
+		}
+	}()
+
+	return nil
 }
 
 func (g *GrpcServer) Close() {

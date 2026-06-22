@@ -311,6 +311,15 @@ func executeBranchCondition(taskName, nodeKey, settingsJSON string, conditionInp
 	// Resolve condition provider from global registry
 	provider := getBranchConditionProvider(taskName, nodeKey, 0)
 	if provider == nil {
+		// Fall back to Condition closure in _branchRegistry (backward compatibility)
+		branches := getRegisteredBranches(taskName)
+		if brs := branches[nodeKey]; len(brs) > 0 && brs[0].Condition != nil {
+			selected, err := brs[0].Condition(nil, conditionInput)
+			if err != nil {
+				return "", fmt.Errorf("branch: condition execution failed: %w", err)
+			}
+			return selected, nil
+		}
 		return "", fmt.Errorf("branch: condition provider not found for %s/%s", taskName, nodeKey)
 	}
 
@@ -332,18 +341,6 @@ func executeBranchCondition(taskName, nodeKey, settingsJSON string, conditionInp
 	selected, ok := result.(string)
 	if !ok {
 		return "", fmt.Errorf("branch: condition returned non-string result: %v", result)
-	}
-
-	// Validate selected key is in end nodes
-	found := false
-	for _, n := range settings.BranchConfig.EndNodes {
-		if n == selected {
-			found = true
-			break
-		}
-	}
-	if !found {
-		return "", fmt.Errorf("branch: selected key %q not in end nodes %v", selected, settings.BranchConfig.EndNodes)
 	}
 
 	return selected, nil

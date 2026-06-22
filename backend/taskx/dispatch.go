@@ -715,11 +715,13 @@ func (t *taskDispatcher) handleBranchResult(ctx context.Context, task *Task, bra
 		return
 	}
 
-	selectedKey := output.Output // The selected end node name or ID
+	selectedKey := output.Output // The selected end node ID
 
 	// Skip unselected end nodes
 	for _, endNodeName := range settings.BranchConfig.EndNodes {
-		if endNodeName == selectedKey {
+		// Resolve name to ID for comparison (EndNodes stores names, selectedKey is ID)
+		endNodeID := task.resolveSubtaskKey(endNodeName)
+		if endNodeID == selectedKey {
 			continue // This is the selected path, keep it active
 		}
 		// Find the subtask by name and skip it
@@ -1174,6 +1176,7 @@ func (t *taskDispatcher) handleTaskImmediately(ctx context.Context, taskIDs []st
 func (t *taskDispatcher) computeInput(ctx context.Context, task *Task, runnings []*model.Subtask) {
 	for i := range runnings {
 		subTaskBean := runnings[i]
+
 		dataPreds := task.dag.dataPred[subTaskBean.ID]
 		if len(dataPreds) > 0 {
 			preSubtasks := make(map[string]string)

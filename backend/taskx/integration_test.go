@@ -960,8 +960,18 @@ func TestIT_Branch_SelectPathB(t *testing.T) {
 	assert.Equal(t, 1, len(next))
 	assert.Equal(t, "start", next[0].GetName())
 
-	// start 完成，分支选择 pathB，pathA 跳过
+	// start 完成，branch subtask becomes next
 	_ = task.UpdateSubtaskState(start.GetID(), NodeSucceeded)
+
+	next = task.NextSubTasks()
+	assert.Equal(t, 1, len(next))
+	assert.True(t, strings.HasPrefix(next[0].GetName(), "branch_"), "branch subtask should be next after start")
+
+	// Execute branch subtask (simulates condition selecting pathB)
+	branchSubtask := next[0]
+	_ = task.UpdateSubtaskState(branchSubtask.GetID(), NodeSucceeded)
+
+	// 分支选择 pathB，pathA 跳过
 	_ = task.SkipSubtask(pathA.GetID())
 
 	next = task.NextSubTasks()
@@ -1027,6 +1037,13 @@ func TestIT_Branch_WithDataFlow(t *testing.T) {
 
 	_ = task.UpdateSubtaskState(start.GetID(), NodeSucceeded)
 
+	// Execute branch subtask
+	next = task.NextSubTasks()
+	assert.Equal(t, 1, len(next))
+	assert.True(t, strings.HasPrefix(next[0].GetName(), "branch_"), "branch subtask should be next after start")
+	branchSubtask := next[0]
+	_ = task.UpdateSubtaskState(branchSubtask.GetID(), NodeSucceeded)
+
 	// 获取 start 的输出数据
 	chB := task.getCompiled().GetChannel(pathB.GetID())
 	data, ready, _ := chB.get()
@@ -1075,15 +1092,21 @@ func TestIT_Branch_SkipAutoPropagation(t *testing.T) {
 	_, err := task.Compile()
 	assert.Nil(t, err)
 
-	// start 完成
+	// start 完成，branch subtask becomes next
 	_ = task.UpdateSubtaskState(start.GetID(), NodeSucceeded)
+
+	next := task.NextSubTasks()
+	assert.Equal(t, 1, len(next))
+	assert.True(t, strings.HasPrefix(next[0].GetName(), "branch_"), "branch subtask should be next")
+	branchSubtask := next[0]
+	_ = task.UpdateSubtaskState(branchSubtask.GetID(), NodeSucceeded)
 
 	// 跳过未选中的路径
 	_ = task.SkipSubtask(pathA.GetID())
 	_ = task.SkipSubtask(pathC.GetID())
 
 	// pathB 可执行
-	next := task.NextSubTasks()
+	next = task.NextSubTasks()
 	assert.Equal(t, 1, len(next))
 	assert.Equal(t, "pathB", next[0].GetName())
 
@@ -1121,7 +1144,7 @@ func TestIT_Branch_AnyPredecessorConverge(t *testing.T) {
 	_, err := task.Compile()
 	assert.Nil(t, err)
 
-	// start 完成
+	// start 完成（no branch on start in this test, just regular edges）
 	_ = task.UpdateSubtaskState(start.GetID(), NodeSucceeded)
 
 	// pathA 完成，pathB 跳过
@@ -1185,17 +1208,32 @@ func TestIT_Branch_Nested(t *testing.T) {
 	_, err := task.Compile()
 	assert.Nil(t, err)
 
-	// start 完成
+	// start 完成，branch subtask becomes next
 	_ = task.UpdateSubtaskState(start.GetID(), NodeSucceeded)
-	// outerB 跳过
-	_ = task.SkipSubtask(outerB.GetID())
 
 	next := task.NextSubTasks()
 	assert.Equal(t, 1, len(next))
+	assert.True(t, strings.HasPrefix(next[0].GetName(), "branch_start"), "outer branch subtask should be next")
+	outerBranch := next[0]
+	_ = task.UpdateSubtaskState(outerBranch.GetID(), NodeSucceeded)
+
+	// outerB 跳过
+	_ = task.SkipSubtask(outerB.GetID())
+
+	next = task.NextSubTasks()
+	assert.Equal(t, 1, len(next))
 	assert.Equal(t, "outerA", next[0].GetName())
 
-	// outerA 完成，innerA2 跳过
+	// outerA 完成, inner branch subtask becomes next
 	_ = task.UpdateSubtaskState(outerA.GetID(), NodeSucceeded)
+
+	next = task.NextSubTasks()
+	assert.Equal(t, 1, len(next))
+	assert.True(t, strings.HasPrefix(next[0].GetName(), "branch_outerA"), "inner branch subtask should be next")
+	innerBranch := next[0]
+	_ = task.UpdateSubtaskState(innerBranch.GetID(), NodeSucceeded)
+
+	// innerA2 跳过
 	_ = task.SkipSubtask(innerA2.GetID())
 
 	next = task.NextSubTasks()
@@ -1239,17 +1277,26 @@ func TestIT_Branch_ConditionError(t *testing.T) {
 	_, err := task.Compile()
 	assert.Nil(t, err)
 
-	// start 完成
+	// start 完成，branch subtask becomes next
 	_ = task.UpdateSubtaskState(start.GetID(), NodeSucceeded)
 
+	next := task.NextSubTasks()
+	assert.Equal(t, 1, len(next))
+	assert.True(t, strings.HasPrefix(next[0].GetName(), "branch_"), "branch subtask should be next")
+	branchSubtask := next[0]
+	// Simulate branch condition error: mark branch subtask as failed
+	_ = task.UpdateSubtaskState(branchSubtask.GetID(), NodeFailed)
+
 	// 分支条件错误时，两个路径都不会自动跳过，需要手动处理
-	// 验证两个路径都处于等待状态
+	// 验证两个路径都处于等待状态（控制依赖来自 branch subtask，它失败了）
 	chA := task.getCompiled().GetChannel(pathA.GetID())
 	chB := task.getCompiled().GetChannel(pathB.GetID())
 	assert.False(t, chA.isSkipped())
 	assert.False(t, chB.isSkipped())
-	assert.True(t, chA.isReady()) // 控制依赖已满足，但分支选择未执行
-	assert.True(t, chB.isReady())
+	// With the branch subtask failed, the control edge from branch→pathA/pathB is not satisfied
+	// So channels may not be ready
+	assert.False(t, chA.isReady())
+	assert.False(t, chB.isReady())
 }
 
 // TestIT_Branch_InvalidEndNode 编译校验：分支 endNode 不存在
@@ -1346,6 +1393,13 @@ func TestIT_Branch_WithExecutorsAndDataFlow(t *testing.T) {
 	assert.NotNil(t, result)
 
 	_ = task.UpdateSubtaskState(start.GetID(), NodeSucceeded)
+
+	// Branch subtask becomes next
+	next = task.NextSubTasks()
+	assert.Equal(t, 1, len(next))
+	assert.True(t, strings.HasPrefix(next[0].GetName(), "branch_"), "branch subtask should be next after start")
+	branchSubtask := next[0]
+	_ = task.UpdateSubtaskState(branchSubtask.GetID(), NodeSucceeded)
 
 	// slowPath 跳过
 	_ = task.SkipSubtask(slowPath.GetID())

@@ -478,10 +478,19 @@ func TestTask_Branch(t *testing.T) {
 	assert.Equal(t, 1, len(next))
 	assert.Equal(t, "start", next[0].GetName())
 
-	// start 完成，分支选择 pathA
+	// start 完成，branch subtask becomes executable
 	_ = task.UpdateSubtaskState(start.GetID(), NodeSucceeded)
 
-	// 手动跳过 pathB（模拟分支选择逻辑）
+	next = task.NextSubTasks()
+	// Branch subtask ("branch_start_0") is now the next executable node
+	assert.Equal(t, 1, len(next))
+	assert.True(t, strings.HasPrefix(next[0].GetName(), "branch_"), "branch subtask should be next")
+
+	// Execute branch subtask (simulate branch condition evaluation)
+	branchSubtask := next[0]
+	_ = task.UpdateSubtaskState(branchSubtask.GetID(), NodeSucceeded)
+
+	// Manually skip pathB (simulates branch selection of pathA)
 	_ = task.SkipSubtask(pathB.GetID())
 
 	next = task.NextSubTasks()
@@ -531,8 +540,17 @@ func TestTask_BranchWithNames(t *testing.T) {
 	assert.Equal(t, 1, len(next))
 	assert.Equal(t, "start", next[0].GetName())
 
-	// start 完成
+	// start 完成，branch subtask becomes executable
 	_ = task.UpdateSubtaskState(start.GetID(), NodeSucceeded)
+
+	next = task.NextSubTasks()
+	// Branch subtask is now the next executable node
+	assert.Equal(t, 1, len(next))
+	assert.True(t, strings.HasPrefix(next[0].GetName(), "branch_"), "branch subtask should be next")
+
+	// Execute branch subtask
+	branchSubtask := next[0]
+	_ = task.UpdateSubtaskState(branchSubtask.GetID(), NodeSucceeded)
 
 	// 手动跳过 pathB（模拟分支选择逻辑）
 	_ = task.SkipSubtask(pathB.GetID())

@@ -370,8 +370,8 @@ func (g *dagGraph) AddBranch(nodeKey string, branch *Branch) error {
 		timeout:     30,
 	}
 
-	// 添加控制边: parent → branch subtask
-	if err := g.AddEdge(nodeKey, branchKey, ControlEdge); err != nil {
+	// 添加数据边: parent → branch subtask (parent output is passed as input)
+	if err := g.AddEdge(nodeKey, branchKey, ControlAndDataEdge); err != nil {
 		return err
 	}
 

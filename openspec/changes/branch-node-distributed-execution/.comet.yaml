@@ -1,5 +1,5 @@
 workflow: full
-phase: build
+phase: verify
 build_mode: subagent-driven-development
 build_pause: null
 isolation: branch
@@ -15,3 +15,4 @@ verified_at: null
 archived: false
 handoff_context: openspec/changes/branch-node-distributed-execution/.comet/handoff/design-context.json
 handoff_hash: 176de85748fe03bdaa034630b03971ce0ac438767f16672ed12aefe6edcac33f
+build_command: cd backend && GOTOOLCHAIN=local GOWORK=off go build github.com/caiflower/dagflow/taskx

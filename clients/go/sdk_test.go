@@ -58,3 +58,16 @@ func TestMultipleFunctionsRegistered(t *testing.T) {
 	assert.Contains(t, funcs, "funcB")
 	assert.Contains(t, funcs, "funcC")
 }
+
+func TestNewClient(t *testing.T) {
+	// Test client creation with a dummy address (won't connect, just tests construction)
+	client, err := NewClient("localhost:50051")
+	if err == nil {
+		defer client.Close()
+	}
+	// Connection may fail, but client struct should be created
+	assert.NotNil(t, client)
+	assert.NotNil(t, client.Flow)
+	assert.NotNil(t, client.Protocol)
+	assert.NotNil(t, client.Execution)
+}

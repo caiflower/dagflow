@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	dagflowpb "github.com/caiflower/dagflow/internal/proto"
 	pb "github.com/caiflower/dagflow/proto/remote_executor"
 )
 
@@ -160,4 +161,35 @@ func (s *ExecutorServer) Execute(ctx context.Context, req *pb.ExecuteRequest) (*
 
 func (s *ExecutorServer) HealthCheck(ctx context.Context, req *pb.HealthRequest) (*pb.HealthResponse, error) {
 	return &pb.HealthResponse{Ok: true}, nil
+}
+
+// ===== DAGFlow gRPC Client =====
+
+// Client provides gRPC access to DAGFlow engine services.
+type Client struct {
+	conn       *grpc.ClientConn
+	Flow       dagflowpb.FlowServiceClient
+	Protocol   dagflowpb.ProtocolServiceClient
+	Execution  dagflowpb.ExecutionServiceClient
+}
+
+// NewClient creates a new DAGFlow gRPC client connected to the engine address.
+func NewClient(engineAddr string) (*Client, error) {
+	conn, err := grpc.NewClient(engineAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("dial engine %s: %w", engineAddr, err)
+	}
+	return &Client{
+		conn:      conn,
+		Flow:      dagflowpb.NewFlowServiceClient(conn),
+		Protocol:  dagflowpb.NewProtocolServiceClient(conn),
+		Execution: dagflowpb.NewExecutionServiceClient(conn),
+	}, nil
+}
+
+// Close closes the underlying gRPC connection.
+func (c *Client) Close() error {
+	return c.conn.Close()
 }

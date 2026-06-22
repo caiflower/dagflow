@@ -21,3 +21,18 @@ func SetProtocolGrpcService(svc *ProtocolGrpcService) {
 func SetExecutionGrpcService(svc *ExecutionGrpcService) {
 	executionGrpcSvc = svc
 }
+
+// GetFlowGrpcService 获取 Flow gRPC 服务
+func GetFlowGrpcService() *FlowGrpcService {
+	return flowGrpcSvc
+}
+
+// GetProtocolGrpcService 获取 Protocol gRPC 服务
+func GetProtocolGrpcService() *ProtocolGrpcService {
+	return protocolGrpcSvc
+}
+
+// GetExecutionGrpcService 获取 Execution gRPC 服务
+func GetExecutionGrpcService() *ExecutionGrpcService {
+	return executionGrpcSvc
+}

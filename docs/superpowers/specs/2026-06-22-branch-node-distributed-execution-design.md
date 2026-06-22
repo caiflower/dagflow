@@ -2,6 +2,8 @@
 comet_change: branch-node-distributed-execution
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-22-branch-node-distributed-execution
+status: final
 ---
 
 # Branch Node Distributed Execution — Technical Design

@@ -41,6 +41,7 @@ import (
 	"github.com/caiflower/dagflow/internal/api"
 	"github.com/caiflower/dagflow/internal/protocol"
 	"github.com/caiflower/dagflow/internal/service"
+	dagflowpb "github.com/caiflower/dagflow/internal/proto"
 	pb "github.com/caiflower/dagflow/proto/remote_executor"
 	"github.com/caiflower/dagflow/taskx"
 	taskxModel "github.com/caiflower/dagflow/taskx/dao/model"
@@ -161,33 +162,65 @@ func initGrpcServices() {
 	nodeReg = node_registry.NewNodeRegistry(redisClient)
 	service.SetNodeRegistry(nodeReg)
 
-	// Start NodeRegistry gRPC server
-	if nodeReg != nil {
-		startNodeRegistryServer()
-	}
+	// Start unified gRPC server as daemon (managed by global.ResourceManger)
+	startGrpcServer()
 }
 
-func startNodeRegistryServer() {
-	port := constants.Prop.GRPC.NodeRegistryPort
+// GrpcServer wraps a gRPC server hosting all DAGFlow services as a daemon resource.
+type GrpcServer struct {
+	server *grpc.Server
+	lis    net.Listener
+}
+
+func (g *GrpcServer) Name() string { return "GrpcServer" }
+
+func (g *GrpcServer) Start() error {
+	logger.Info("gRPC server listening on %s", g.lis.Addr().String())
+	return g.server.Serve(g.lis)
+}
+
+func (g *GrpcServer) Close() {
+	logger.Info("gRPC server shutting down...")
+	g.server.GracefulStop()
+	logger.Info("gRPC server stopped")
+}
+
+func startGrpcServer() {
+	port := constants.Prop.GRPC.Port
 	if port == 0 {
 		port = 50051
 	}
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
-		logger.Error("failed to listen on NodeRegistry port %d: %v", port, err)
+		logger.Error("failed to listen on gRPC port %d: %v", port, err)
 		return
 	}
 
 	s := grpc.NewServer()
-	pb.RegisterNodeRegistryServer(s, nodeReg)
 
-	go func() {
-		logger.Info("NodeRegistry gRPC server listening on :%d", port)
-		if err := s.Serve(lis); err != nil {
-			logger.Error("NodeRegistry gRPC server error: %v", err)
-		}
-	}()
+	// Register NodeRegistry service
+	if nodeReg != nil {
+		pb.RegisterNodeRegistryServer(s, nodeReg)
+		logger.Info("gRPC: NodeRegistry service registered")
+	}
+
+	// Register Flow/Protocol/Execution services
+	if flowSvc := api.GetFlowGrpcService(); flowSvc != nil {
+		dagflowpb.RegisterFlowServiceServer(s, flowSvc)
+		logger.Info("gRPC: Flow service registered")
+	}
+	if protoSvc := api.GetProtocolGrpcService(); protoSvc != nil {
+		dagflowpb.RegisterProtocolServiceServer(s, protoSvc)
+		logger.Info("gRPC: Protocol service registered")
+	}
+	if execSvc := api.GetExecutionGrpcService(); execSvc != nil {
+		dagflowpb.RegisterExecutionServiceServer(s, execSvc)
+		logger.Info("gRPC: Execution service registered")
+	}
+
+	grpcServer := &GrpcServer{server: s, lis: lis}
+	global.DefaultResourceManger.AddDaemon(grpcServer)
 }
 
 // initWeb 创建 Web 引擎并注册路由

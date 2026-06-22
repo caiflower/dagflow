@@ -32,7 +32,7 @@ type Config struct {
 
 // GRPCConfig gRPC 服务配置
 type GRPCConfig struct {
-	NodeRegistryPort int `yaml:"node_registry_port" json:"node_registry_port"`
+	Port int `yaml:"port" json:"port"`
 }
 
 // Prop 业务配置实例

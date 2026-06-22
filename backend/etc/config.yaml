@@ -5,4 +5,4 @@ go_max_procs: 0
 redis_embedded: true
 
 grpc:
-  node_registry_port: 50051
+  port: 50051

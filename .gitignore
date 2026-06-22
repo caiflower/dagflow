@@ -30,4 +30,4 @@ hertz
 .comet
 **/.comet*.db
 **/*.db
-go.work*
+go.work*backend/server

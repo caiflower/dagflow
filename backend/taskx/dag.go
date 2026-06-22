@@ -18,6 +18,8 @@ package taskx
 
 import (
 	"errors"
+	"fmt"
+
 	"reflect"
 	"strings"
 	"time"
@@ -346,15 +348,42 @@ func (g *dagGraph) AddEdge(from, to string, edgeType EdgeType, mappings ...*Fiel
 	return nil
 }
 
-// AddBranch 添加分支
+// AddBranch 添加分支，创建专用的分支子任务节点和控制边
 func (g *dagGraph) AddBranch(nodeKey string, branch *Branch) error {
 	if g.compiled {
 		return ErrGraphCompiled
 	}
-	if _, exists := g.nodes[nodeKey]; !exists {
+	parentNode := g.nodes[nodeKey]
+	if parentNode == nil {
 		return errors.New("node not found: " + nodeKey)
 	}
-	g.branches[nodeKey] = append(g.branches[nodeKey], branch)
+
+	// 生成分支子任务节点 key
+	branchKey := fmt.Sprintf("branch_%s_%d", nodeKey, len(g.branches[nodeKey]))
+
+	// 在 DAG 中创建分支子任务节点
+	g.nodes[branchKey] = &dagNode{
+		key:         branchKey,
+		triggerMode: AllPredecessor,
+		state:       NodePending,
+		priority:    parentNode.priority,
+		timeout:     30,
+	}
+
+	// 添加控制边: parent → branch subtask
+	if err := g.AddEdge(nodeKey, branchKey, ControlEdge); err != nil {
+		return err
+	}
+
+	// 添加控制边: branch subtask → 每个目标节点
+	for endKey := range branch.EndNodes {
+		if err := g.AddEdge(branchKey, endKey, ControlEdge); err != nil {
+			return err
+		}
+	}
+
+	// 以分支子任务节点为 key 存储分支元数据
+	g.branches[branchKey] = append(g.branches[branchKey], branch)
 	return nil
 }
 

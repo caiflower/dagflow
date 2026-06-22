@@ -480,9 +480,36 @@ func (t *Task) AddBranch(node *Subtask, branch *Branch) error {
 		}
 	}
 
-	registerBranch(t.task.TaskName, node.GetID(), branch)
+	// Build BranchConfig for persistence
+	endNodeNames := make([]string, 0, len(branch.EndNodes))
+	for k := range branch.EndNodes {
+		if s, exists := t.subtaskMap[k]; exists {
+			endNodeNames = append(endNodeNames, s.GetName())
+		}
+	}
+	providerName := ""
 	if branch.ConditionProvider != nil {
-		registerBranchConditionProvider(t.task.TaskName, node.GetID(), branch.ConditionProvider)
+		providerName = string(branch.ConditionProvider.Protocol())
+	}
+
+	// Create branch subtask (will be persisted as a regular subtask row)
+	branchSubtask := NewSubtask(
+		fmt.Sprintf("branch_%s", node.GetName()), nil)
+	branchSubtask.subtask.ID = fmt.Sprintf("branch_%s_%d", node.GetID(), len(t.dag.branches[node.GetID()]))
+	branchSubtask.subtask.Settings = tools.ToJson(SubtaskSettings{
+		BranchConfig: &BranchConfig{
+			EndNodes:          endNodeNames,
+			ConditionProvider: providerName,
+		},
+	})
+
+	// Add to subtask map so it participates in serialization and DAG compilation
+	t.subtaskMap[branchSubtask.GetID()] = branchSubtask
+
+	// Register branch to global registries (keyed by branch subtask ID)
+	registerBranch(t.task.TaskName, branchSubtask.GetID(), branch)
+	if branch.ConditionProvider != nil {
+		registerBranchConditionProvider(t.task.TaskName, branchSubtask.GetID(), branch.ConditionProvider)
 	}
 	return t.dag.AddBranch(node.GetID(), branch)
 }
@@ -1042,26 +1069,29 @@ func (t *Task) convert2Bean() (*model.Task, []model.Subtask, []model.TaskEdge) {
 			bean.PreSubtaskID = strings.Join(ids, ",")
 		}
 		bean.Status = 1
-		// Serialize branch config to settings JSON
-		if branches, ok := t.dag.branches[subtask.GetID()]; ok && len(branches) > 0 {
-			settings := SubtaskSettings{}
-			for _, br := range branches {
-				endNodeNames := make([]string, 0, len(br.EndNodes))
-				for k := range br.EndNodes {
-					if s, exists := t.subtaskMap[k]; exists {
-						endNodeNames = append(endNodeNames, s.GetName())
+		// Serialize branch config to settings JSON (only for legacy parent subtasks)
+		// New branch subtasks already have Settings.BranchConfig populated in AddBranch()
+		if bean.Settings == "" {
+			if branches, ok := t.dag.branches[subtask.GetID()]; ok && len(branches) > 0 {
+				settings := SubtaskSettings{}
+				for _, br := range branches {
+					endNodeNames := make([]string, 0, len(br.EndNodes))
+					for k := range br.EndNodes {
+						if s, exists := t.subtaskMap[k]; exists {
+							endNodeNames = append(endNodeNames, s.GetName())
+						}
+					}
+					providerName := ""
+					if br.ConditionProvider != nil {
+						providerName = string(br.ConditionProvider.Protocol())
+					}
+					settings.BranchConfig = &BranchConfig{
+						EndNodes:          endNodeNames,
+						ConditionProvider: providerName,
 					}
 				}
-				providerName := ""
-				if br.ConditionProvider != nil {
-					providerName = string(br.ConditionProvider.Protocol())
-				}
-				settings.BranchConfig = &BranchConfig{
-					EndNodes:          endNodeNames,
-					ConditionProvider: providerName,
-				}
+				bean.Settings = tools.ToJson(settings)
 			}
-			bean.Settings = tools.ToJson(settings)
 		}
 		subtaskBeans = append(subtaskBeans, bean)
 	}

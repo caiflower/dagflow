@@ -565,15 +565,13 @@ func (t *taskDispatcher) analysisTask(ctx context.Context, task *Task, subtaskMa
 	// Determine if rollback is truly triggered: only subtasks with state=failed indicate retries are exhausted and rollback is needed
 	// state=pending + retry>0 means still retrying, rollback should not be triggered
 	rollbackTriggered := false
-	hasRetrying := false
 	for _, subtask := range subtaskMap {
 		if subtask.GetState() == string(TaskFailed) {
 			rollbackTriggered = true
-			hasRetrying = subtask.subtask.Retry > 0
 		}
 	}
 
-	if rollbackTriggered && !hasRetrying {
+	if rollbackTriggered {
 		// Leaf-first rollback: Task computes leaves internally, dispatcher filters by canExecuteSubtask
 		leafRollbacks := task.LeafRollbackSubtasks()
 		for _, s := range leafRollbacks {
@@ -594,6 +592,19 @@ func (t *taskDispatcher) analysisTask(ctx context.Context, task *Task, subtaskMa
 		// Task completed (rollback finished), remove from cache to prevent memory leaks
 		t.taskCache.Delete(task.GetID())
 		return
+	}
+
+	// Re-dispatch running subtasks that still have retries (e.g. SetRetry failed
+	// in the receiver due to a transient DB outage). These subtasks are stuck in
+	// "running" state because the receiver couldn't persist the retry decrement.
+	for _, subtask := range subtaskMap {
+		if subtask.GetState() == string(TaskRunning) && subtask.subtask.Retry > 0 {
+			if t.canExecuteSubtask(subtask, false) {
+				logger.Info("[analysisTask] task=%s subtask=%s re-dispatching running subtask (retry=%d)",
+					task.GetID(), subtask.GetID(), subtask.subtask.Retry)
+				runningSubtasks = append(runningSubtasks, subtask.getModel())
+			}
+		}
 	}
 
 	// Get the next executable subtasks

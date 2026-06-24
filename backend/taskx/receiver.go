@@ -409,11 +409,14 @@ func (t *taskReceiver) persistSubtaskOutcome(ctx context.Context, bag *SubtaskBa
 
 		if bag.subtask.Retry > 0 && !errors.Is(execErr, ErrNonRetryable) {
 			if err := t.SubtaskDao.SetRetry(ctx, subtaskID, bag.subtask.Retry-1); err != nil {
-				logger.Error("[execSubtask] subtask %s SetRetry failed. err=%v", subtaskID, err)
+				logger.Error("[execSubtask] subtask %s SetRetry failed, fall through to TaskFailed. err=%v", subtaskID, err)
+				// fall through to TaskFailed below — dispatcher timeout detection will catch
+				// this if SetOutputAndState also fails.
+			} else {
+				// 通知 leader 重新调度，加快 retry 子任务的处理速度
+				t.notifyLeader(taskID)
+				return
 			}
-			// 通知 leader 重新调度，加快 retry 子任务的处理速度
-			t.notifyLeader(taskID)
-			return
 		}
 
 		_output.Err = execErr.Error()
@@ -448,7 +451,12 @@ func (t *taskReceiver) persistRollbackOutcome(ctx context.Context, bag *SubtaskB
 				logger.Error("[execSubtaskRollback] subtask %s SetRollbackAndState failed. err=%v", subtaskID, err)
 			}
 			if err := t.SubtaskDao.SetRetry(ctx, subtaskID, bag.subtask.Retry-1); err != nil {
-				logger.Error("[execSubtaskRollback] subtask %s SetRetry failed. err=%v", subtaskID, err)
+				logger.Error("[execSubtaskRollback] subtask %s SetRetry failed, marking RollbackFailed. err=%v", subtaskID, err)
+				_output.RollbackErr = fmt.Sprintf("SetRetry failed: %v", err)
+				if err2 := t.SubtaskDao.SetRollbackAndState(ctx, subtaskID, string(RollbackFailed), tools.ToJson(_output)); err2 != nil {
+					logger.Error("[execSubtaskRollback] subtask %s SetRollbackAndState(failed) also failed. err=%v", subtaskID, err2)
+				}
+				return
 			}
 			t.notifyLeader(taskID)
 			return

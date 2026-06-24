@@ -286,6 +286,7 @@ func (t *taskReceiver) execSubtask(bag *SubtaskBag) {
 		logger.Trace("[execSubtask] detected branch subtask %s, executing condition", subtaskID)
 		selectedKey, err := executeBranchCondition(
 			bag.task.TaskName,
+			bag.subtask.TaskName,
 			bag.subtask.ID,
 			bag.subtask.Settings,
 			bag.subtask.Input,

@@ -59,7 +59,7 @@ func (p *RemoteFuncProvider) Execute(ctx context.Context, data *executor.TaskDat
 		return nil, fmt.Errorf("remote function %q error: %s", p.FuncName, resp.Error)
 	}
 
-	return map[string]any{"output": string(resp.Output)}, nil
+	return resp.Output, nil
 }
 
 func (p *RemoteFuncProvider) Protocol() executor.Protocol {

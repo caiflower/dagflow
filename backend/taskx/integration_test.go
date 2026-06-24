@@ -385,11 +385,11 @@ func TestIT_BranchCondition_WithExecutors(t *testing.T) {
 	_ = task.AddEdge(branchA, end)
 	_ = task.AddEdge(branchB, end)
 
-	// 注册分支条件
-	task.RegisterBranchCondition(start.GetID(), "default", func(ctx interface{}, input any) (string, error) {
-		// 选择 branchA
+	// 注册分支条件（使用 AddBranch + ConditionProvider）
+	branchProvider := executor.NewLocalExecutor(func(ctx context.Context, input map[string]any) (string, error) {
 		return branchA.GetID(), nil
 	})
+	_ = task.AddBranch(start, NewBranch(branchProvider, map[string]bool{branchA.GetID(): true, branchB.GetID(): true}))
 
 	_, err := task.Compile()
 	assert.Nil(t, err)
@@ -397,17 +397,24 @@ func TestIT_BranchCondition_WithExecutors(t *testing.T) {
 	// 注册任务回调（执行器已在 AddSubtask 时自动注册）
 	task.RegisterTaskExecutor(exec)
 
-	// start -> branchA/branchB 分支选择
+	// start is the first executable subtask
 	next := task.NextSubTasks()
 	assert.Equal(t, 1, len(next))
 	assert.Equal(t, "start", next[0].GetName())
 
 	_ = task.UpdateSubtaskState(start.GetID(), NodeSucceeded)
 
-	// 模拟分支选择：branchB 跳过
+	// After start, the branch subtask (branch_start) becomes executable
+	next = task.NextSubTasks()
+	assert.Equal(t, 1, len(next))
+	assert.True(t, strings.HasPrefix(next[0].GetName(), "branch_"), "branch subtask should be next")
+
+	// Execute the branch condition: selects branchA, skips branchB
+	branchSubtask := next[0]
+	_ = task.UpdateSubtaskState(branchSubtask.GetID(), NodeSucceeded)
 	_ = task.SkipSubtask(branchB.GetID())
 
-	// 只有 branchA 可执行
+	// Only branchA is executable now
 	next = task.NextSubTasks()
 	assert.Equal(t, 1, len(next))
 	assert.Equal(t, "branchA", next[0].GetName())
@@ -418,7 +425,7 @@ func TestIT_BranchCondition_WithExecutors(t *testing.T) {
 
 	_ = task.UpdateSubtaskState(branchA.GetID(), NodeSucceeded)
 
-	// end 可执行（branchB 已跳过，不阻塞）
+	// end is executable (branchB skipped, doesn't block)
 	next = task.NextSubTasks()
 	assert.Equal(t, 1, len(next))
 	assert.Equal(t, "end", next[0].GetName())
@@ -945,9 +952,9 @@ func TestIT_Branch_SelectPathB(t *testing.T) {
 
 	// 添加分支：选择 pathB
 	_ = task.AddBranch(start, &Branch{
-		Condition: func(ctx interface{}, input any) (string, error) {
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
 			return pathB.GetID(), nil
-		},
+		}),
 		EndNodes: map[string]bool{pathA.GetID(): true, pathB.GetID(): true},
 	})
 
@@ -1014,7 +1021,7 @@ func TestIT_Branch_WithDataFlow(t *testing.T) {
 
 	// 添加分支：根据 start 输出选择路径
 	_ = task.AddBranch(start, &Branch{
-		Condition: func(ctx interface{}, input any) (string, error) {
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
 			// 根据 start 输出选择 pathB
 			if m, ok := input.(map[string]any); ok {
 				if decision, ok := m["decision"].(string); ok && decision == "B" {
@@ -1022,7 +1029,7 @@ func TestIT_Branch_WithDataFlow(t *testing.T) {
 				}
 			}
 			return pathA.GetID(), nil
-		},
+		}),
 		EndNodes: map[string]bool{pathA.GetID(): true, pathB.GetID(): true},
 	})
 
@@ -1083,9 +1090,9 @@ func TestIT_Branch_SkipAutoPropagation(t *testing.T) {
 
 	// 三路分支，只选 pathB
 	_ = task.AddBranch(start, &Branch{
-		Condition: func(ctx interface{}, input any) (string, error) {
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
 			return pathB.GetID(), nil
-		},
+		}),
 		EndNodes: map[string]bool{pathA.GetID(): true, pathB.GetID(): true, pathC.GetID(): true},
 	})
 
@@ -1191,17 +1198,17 @@ func TestIT_Branch_Nested(t *testing.T) {
 
 	// 外层分支：选 outerA
 	_ = task.AddBranch(start, &Branch{
-		Condition: func(ctx interface{}, input any) (string, error) {
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
 			return outerA.GetID(), nil
-		},
+		}),
 		EndNodes: map[string]bool{outerA.GetID(): true, outerB.GetID(): true},
 	})
 
 	// 内层分支：选 innerA1
 	_ = task.AddBranch(outerA, &Branch{
-		Condition: func(ctx interface{}, input any) (string, error) {
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
 			return innerA1.GetID(), nil
-		},
+		}),
 		EndNodes: map[string]bool{innerA1.GetID(): true, innerA2.GetID(): true},
 	})
 
@@ -1268,9 +1275,9 @@ func TestIT_Branch_ConditionError(t *testing.T) {
 
 	// 分支条件返回错误
 	_ = task.AddBranch(start, &Branch{
-		Condition: func(ctx interface{}, input any) (string, error) {
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
 			return "", errors.New("condition evaluation failed")
-		},
+		}),
 		EndNodes: map[string]bool{pathA.GetID(): true, pathB.GetID(): true},
 	})
 
@@ -1312,9 +1319,9 @@ func TestIT_Branch_InvalidEndNode(t *testing.T) {
 
 	// endNode "nonExist" 不在图中，AddBranch 时不校验，Compile 时校验
 	err := task.AddBranch(start, &Branch{
-		Condition: func(ctx interface{}, input any) (string, error) {
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
 			return pathA.GetID(), nil
-		},
+		}),
 		EndNodes: map[string]bool{pathA.GetID(): true, "nonExist": true},
 	})
 	assert.Nil(t, err) // AddBranch 不校验 endNode
@@ -1365,7 +1372,7 @@ func TestIT_Branch_WithExecutorsAndDataFlow(t *testing.T) {
 
 	// 分支：根据 decision 选择路径
 	_ = task.AddBranch(start, &Branch{
-		Condition: func(ctx interface{}, input any) (string, error) {
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
 			if m, ok := input.(map[string]any); ok {
 				if decision, ok := m["decision"].(string); ok {
 					if decision == "fast" {
@@ -1374,7 +1381,7 @@ func TestIT_Branch_WithExecutorsAndDataFlow(t *testing.T) {
 				}
 			}
 			return slowPath.GetID(), nil
-		},
+		}),
 		EndNodes: map[string]bool{fastPath.GetID(): true, slowPath.GetID(): true},
 	})
 

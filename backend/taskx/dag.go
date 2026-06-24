@@ -192,8 +192,6 @@ type BranchConfig struct {
 type Branch struct {
 	// ConditionProvider 可持久化的条件执行器，Execute 返回选中的目标节点 key (string)
 	ConditionProvider executor.ExecutorProvider
-	// Condition 向后兼容的闭包条件函数，不持久化到 DB
-	Condition func(ctx interface{}, input any) (string, error)
 	// EndNodes 分支目标节点集合
 	EndNodes map[string]bool
 }
@@ -203,14 +201,6 @@ func NewBranch(provider executor.ExecutorProvider, endNodes map[string]bool) *Br
 	return &Branch{
 		ConditionProvider: provider,
 		EndNodes:          endNodes,
-	}
-}
-
-// NewBranchFunc 创建基于闭包的条件分支（向后兼容，不持久化）
-func NewBranchFunc(condition func(ctx interface{}, input any) (string, error), endNodes map[string]bool) *Branch {
-	return &Branch{
-		Condition: condition,
-		EndNodes:  endNodes,
 	}
 }
 

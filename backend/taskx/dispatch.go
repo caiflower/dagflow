@@ -643,7 +643,7 @@ func (t *taskDispatcher) processBranches(ctx context.Context, task *Task) {
 		}
 
 		for _, branch := range branches {
-			if branch.ConditionProvider == nil && branch.Condition == nil {
+			if branch.ConditionProvider == nil {
 				continue
 			}
 
@@ -655,30 +655,29 @@ func (t *taskDispatcher) processBranches(ctx context.Context, task *Task) {
 				input = data
 			}
 
-			// Execute the condition: prefer ConditionProvider, fallback to Condition closure
+			// Execute the condition via ConditionProvider
+			if branch.ConditionProvider == nil {
+				continue
+			}
+			taskData := &executor.TaskData{
+				RequestId: task.task.RequestID,
+				TaskId:    task.task.ID,
+				SubTaskId: nodeKey,
+			}
+			if input != nil {
+				if s, ok := input.(string); ok {
+					taskData.Input = s
+				}
+			}
+			result, execErr := branch.ConditionProvider.Execute(ctx, taskData)
 			var selectedKey string
 			var condErr error
-			if branch.ConditionProvider != nil {
-				taskData := &executor.TaskData{
-					RequestId: task.task.RequestID,
-					TaskId:    task.task.ID,
-					SubTaskId: nodeKey,
-				}
-				if input != nil {
-					if s, ok := input.(string); ok {
-						taskData.Input = s
-					}
-				}
-				result, execErr := branch.ConditionProvider.Execute(ctx, taskData)
-				if execErr != nil {
-					condErr = execErr
-				} else if s, ok := result.(string); ok {
-					selectedKey = s
-				} else {
-					condErr = fmt.Errorf("branch ConditionProvider returned non-string result: %v", result)
-				}
+			if execErr != nil {
+				condErr = execErr
+			} else if s, ok := result.(string); ok {
+				selectedKey = s
 			} else {
-				selectedKey, condErr = branch.Condition(nil, input)
+				condErr = fmt.Errorf("branch ConditionProvider returned non-string result: %v", result)
 			}
 
 			if condErr != nil {

@@ -608,9 +608,9 @@ func submitBranchTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, done cha
 	_ = task.AddEdge(pathA, end)
 	_ = task.AddEdge(pathB, end)
 	_ = task.AddBranch(start, &Branch{
-		Condition: func(ctx interface{}, input any) (string, error) {
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
 			return pathA.GetID(), nil
-		},
+		}),
 		EndNodes: map[string]bool{pathA.GetID(): true, pathB.GetID(): true},
 	})
 
@@ -653,15 +653,15 @@ func submitNestedBranchTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, do
 	_ = task.AddEdge(innerA2, end)
 	_ = task.AddEdge(outerB, end)
 	_ = task.AddBranch(start, &Branch{
-		Condition: func(ctx interface{}, input any) (string, error) {
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
 			return outerA.GetID(), nil
-		},
+		}),
 		EndNodes: map[string]bool{outerA.GetID(): true, outerB.GetID(): true},
 	})
 	_ = task.AddBranch(outerA, &Branch{
-		Condition: func(ctx interface{}, input any) (string, error) {
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
 			return innerA1.GetID(), nil
-		},
+		}),
 		EndNodes: map[string]bool{innerA1.GetID(): true, innerA2.GetID(): true},
 	})
 
@@ -786,29 +786,34 @@ func TestBranchSettingsPersistenceRoundtrip(t *testing.T) {
 	branchesMap := restoredTask.compiled.GetBranchesMap()
 	assert.GreaterOrEqual(t, len(branchesMap), 1, "should have at least 1 branch entry")
 
+	// Resolve branch subtask name for provider lookup
+	branchSubtaskName := ""
+	for _, st := range subtaskBeans {
+		if strings.HasPrefix(st.ID, "branch_") {
+			branchSubtaskName = st.TaskName
+			break
+		}
+	}
+	assert.NotEmpty(t, branchSubtaskName, "branch subtask name should be found")
+
 	found := false
 	for _, branches := range branchesMap {
 		if len(branches) == 1 {
 			branch := branches[0]
-			assert.NotNil(t, branch.ConditionProvider, "ConditionProvider should be restored from global registry")
 			assert.Equal(t, 2, len(branch.EndNodes), "endNodes should be restored")
 			found = true
 		}
 	}
-	assert.True(t, found, "should find branch with ConditionProvider restored")
+	assert.True(t, found, "should find branch with EndNodes restored")
 
-	// Verify the restored ConditionProvider works by executing it
-	for _, branches := range branchesMap {
-		if len(branches) == 1 {
-			branch := branches[0]
-			result, execErr := branch.ConditionProvider.Execute(context.Background(), &executor.TaskData{
-				Input: `{"name":"start"}`,
-			})
-			assert.NoError(t, execErr, "restored ConditionProvider should execute successfully")
-			assert.Equal(t, pathA.GetID(), result, "restored ConditionProvider should return correct path")
-			break
-		}
-	}
+	// Verify ConditionProvider is resolvable via getProvider at execution time
+	provider := getProvider(taskName, branchSubtaskName)
+	assert.NotNil(t, provider, "ConditionProvider should be resolvable via getProvider")
+	result, execErr := provider.Execute(context.Background(), &executor.TaskData{
+		Input: `{"name":"start"}`,
+	})
+	assert.NoError(t, execErr, "resolved ConditionProvider should execute successfully")
+	assert.Equal(t, pathA.GetID(), result, "resolved ConditionProvider should return correct path")
 
 	// Clean up global registries
 	ClearProviders(taskName)

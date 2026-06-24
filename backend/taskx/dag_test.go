@@ -293,7 +293,7 @@ func TestCompile_InvalidBranchEndNode(t *testing.T) {
 	_ = g.AddEdge("a", "b", ControlEdge)
 
 	err := g.AddBranch("a", &Branch{
-		Condition: func(ctx interface{}, input any) (string, error) { return "c", nil },
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) { return "c", nil }),
 		EndNodes:  map[string]bool{"c": true}, // c 不存在
 	})
 	assert.Nil(t, err)
@@ -464,9 +464,9 @@ func TestTask_Branch(t *testing.T) {
 
 	// 添加分支：选择 pathA（使用子任务 ID 作为 endNodes）
 	_ = task.AddBranch(start, &Branch{
-		Condition: func(ctx interface{}, input any) (string, error) {
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
 			return pathA.GetID(), nil
-		},
+		}),
 		EndNodes: map[string]bool{pathA.GetID(): true, pathB.GetID(): true},
 	})
 
@@ -526,9 +526,9 @@ func TestTask_BranchWithNames(t *testing.T) {
 
 	// 使用 name（而非 GetID()）设置分支
 	_ = task.AddBranch(start, &Branch{
-		Condition: func(ctx interface{}, input any) (string, error) {
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
 			return "pathA", nil // return name instead of ID
-		},
+		}),
 		EndNodes: map[string]bool{"pathA": true, "pathB": true}, // use names
 	})
 
@@ -588,9 +588,9 @@ func TestTask_BranchMixedNameAndID(t *testing.T) {
 
 	// 混合使用：EndNodes 用 name，Condition 返回 ID
 	_ = task.AddBranch(start, &Branch{
-		Condition: func(ctx interface{}, input any) (string, error) {
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
 			return pathA.GetID(), nil // return ID
-		},
+		}),
 		EndNodes: map[string]bool{"pathA": true, pathB.GetID(): true}, // mix name and ID
 	})
 

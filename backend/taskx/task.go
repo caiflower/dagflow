@@ -457,18 +457,6 @@ func (t *Task) AddBranch(node *Subtask, branch *Branch) error {
 	}
 	branch.EndNodes = resolvedEndNodes
 
-	// Wrap Condition: translate returned name to ID
-	if branch.Condition != nil {
-		origCond := branch.Condition
-		branch.Condition = func(ctx interface{}, input any) (string, error) {
-			selected, err := origCond(ctx, input)
-			if err != nil {
-				return "", err
-			}
-			return t.resolveSubtaskKey(selected), nil
-		}
-	}
-
 	// Wrap ConditionProvider: translate returned name to ID
 	if branch.ConditionProvider != nil {
 		origProvider := branch.ConditionProvider
@@ -506,10 +494,10 @@ func (t *Task) AddBranch(node *Subtask, branch *Branch) error {
 	// Add to subtask map so it participates in serialization and DAG compilation
 	t.subtaskMap[branchSubtask.GetID()] = branchSubtask
 
-	// Register branch to global registries (keyed by branch subtask ID)
-	registerBranch(t.task.TaskName, branchSubtask.GetID(), branch)
+	// Register branch condition provider under branch subtask name
+	// (so executeBranchCondition can resolve it via getProvider at execution time)
 	if branch.ConditionProvider != nil {
-		registerBranchConditionProvider(t.task.TaskName, branchSubtask.GetID(), branch.ConditionProvider)
+		registerProvider(t.task.TaskName, branchSubtask.GetName(), branch.ConditionProvider)
 	}
 	return t.dag.AddBranch(node.GetID(), branch)
 }
@@ -760,19 +748,9 @@ func RegisterTaskExecutor(taskExecutor TaskExecutor) {
 	registerTaskExecutor(taskExecutor)
 }
 
-// RegisterBranchCondition registers a branch condition
-func (t *Task) RegisterBranchCondition(nodeKey, branchKey string, condition func(ctx interface{}, input any) (string, error)) {
-	t.em.registerBranchCondition(nodeKey, branchKey, condition)
-}
-
 // getProvider returns the subtask executor (internal use; users should use Subtask.GetExecutor())
 func (t *Task) getProvider(taskName, subTaskName string) executor.ExecutorProvider {
 	return t.em.getProvider(taskName, subTaskName)
-}
-
-// getBranchCondition returns the branch condition (internal use)
-func (t *Task) getBranchCondition(nodeKey, branchKey string) func(ctx interface{}, input any) (string, error) {
-	return t.em.getBranchCondition(nodeKey, branchKey)
 }
 
 // getCallback returns the callback (internal use)
@@ -934,7 +912,6 @@ type executorManager struct {
 
 	taskExecutors     map[string]TaskExecutor
 	subtaskProviders  map[string]map[string]executor.ExecutorProvider
-	branchConditions  map[string]map[string]func(ctx interface{}, input any) (string, error)
 	rollbackProviders map[string]executor.ExecutorProvider // key: taskName/subTaskName
 }
 
@@ -942,7 +919,6 @@ func newExecutorManager() *executorManager {
 	return &executorManager{
 		taskExecutors:     make(map[string]TaskExecutor),
 		subtaskProviders:  make(map[string]map[string]executor.ExecutorProvider),
-		branchConditions:  make(map[string]map[string]func(ctx interface{}, input any) (string, error)),
 		rollbackProviders: make(map[string]executor.ExecutorProvider),
 	}
 }
@@ -978,16 +954,6 @@ func (em *executorManager) registerProvider(taskName, subTaskName string, p exec
 	em.subtaskProviders[taskName][subTaskName] = p
 }
 
-func (em *executorManager) registerBranchCondition(nodeKey, branchKey string, condition func(ctx interface{}, input any) (string, error)) {
-	em.mu.Lock()
-	defer em.mu.Unlock()
-
-	if em.branchConditions[nodeKey] == nil {
-		em.branchConditions[nodeKey] = make(map[string]func(ctx interface{}, input any) (string, error))
-	}
-	em.branchConditions[nodeKey][branchKey] = condition
-}
-
 func (em *executorManager) registerRollbackProvider(taskName, subTaskName string, p executor.ExecutorProvider) {
 	em.mu.Lock()
 	defer em.mu.Unlock()
@@ -1009,16 +975,6 @@ func (em *executorManager) getProvider(taskName, subTaskName string) executor.Ex
 
 	if providers, ok := em.subtaskProviders[taskName]; ok {
 		return providers[subTaskName]
-	}
-	return nil
-}
-
-func (em *executorManager) getBranchCondition(nodeKey, branchKey string) func(ctx interface{}, input any) (string, error) {
-	em.mu.RLock()
-	defer em.mu.RUnlock()
-
-	if conditions, ok := em.branchConditions[nodeKey]; ok {
-		return conditions[branchKey]
 	}
 	return nil
 }
@@ -1142,7 +1098,7 @@ func (t *Task) convert2Bean() (*model.Task, []model.Subtask, []model.TaskEdge) {
 //   - rollbackStrategy restored from task.rollback_strategy
 //   - fieldMappings restored from task_edge.field_mappings JSON
 //
-// Branch condition nodes (Branch.Condition) and executors (ExecutorProvider) are code-level concepts, restored via the global registry.
+// Branch condition nodes use ExecutorProvider registered via registerProvider.
 func (t *Task) initByBean(taskBean *model.Task, subtaskBeans []model.Subtask, edges []model.TaskEdge) (*Task, error) {
 	t.task = *taskBean
 	t.rollbackStrategy = rollbackStrategyFromDBString(taskBean.RollbackStrategy)
@@ -1255,28 +1211,11 @@ func (t *Task) initByBean(taskBean *model.Task, subtaskBeans []model.Subtask, ed
 		branch := &Branch{
 			EndNodes: endNodes,
 		}
-		if p := getBranchConditionProvider(taskBean.TaskName, subtask.GetID(), 0); p != nil {
-			branch.ConditionProvider = p
-		}
+		// ConditionProvider is restored at execution time via getProvider(subtaskName)
 
 		t.dag.branches[subtask.GetID()] = append(t.dag.branches[subtask.GetID()], branch)
 	}
 
-	// Also restore from global memory registry (legacy fallback / additional data).
-	if registeredBranches := getRegisteredBranches(taskBean.TaskName); len(registeredBranches) > 0 {
-		for nodeKey, branches := range registeredBranches {
-			for i, br := range branches {
-				if br.ConditionProvider == nil && br.Condition == nil {
-					if p := getBranchConditionProvider(taskBean.TaskName, nodeKey, i); p != nil {
-						br.ConditionProvider = p
-					}
-				}
-			}
-			if _, exists := t.dag.branches[nodeKey]; !exists {
-				t.dag.branches[nodeKey] = branches
-			}
-		}
-	}
 	// Compile DAG
 	if _, err := t.Compile(); err != nil {
 		return nil, err

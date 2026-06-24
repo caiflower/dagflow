@@ -133,17 +133,6 @@ func ClearProviders(taskName string) {
 		}
 	}
 
-	_branchRegistry.Lock()
-	defer _branchRegistry.Unlock()
-	delete(_branchRegistry.branches, taskName)
-
-	_branchConditionProviderRegistry.Lock()
-	defer _branchConditionProviderRegistry.Unlock()
-	for key := range _branchConditionProviderRegistry.providers {
-		if strings.HasPrefix(key, taskName+"/") {
-			delete(_branchConditionProviderRegistry.providers, key)
-		}
-	}
 
 	_customRollbackRegistry.Lock()
 	defer _customRollbackRegistry.Unlock()
@@ -160,13 +149,6 @@ func ClearAllProviders() {
 	defer _rollbackRegistry.Unlock()
 	_rollbackRegistry.providers = make(map[string]executor.ExecutorProvider)
 
-	_branchRegistry.Lock()
-	defer _branchRegistry.Unlock()
-	_branchRegistry.branches = make(map[string]map[string][]*Branch)
-
-	_branchConditionProviderRegistry.Lock()
-	defer _branchConditionProviderRegistry.Unlock()
-	_branchConditionProviderRegistry.providers = make(map[string]executor.ExecutorProvider)
 
 	_customRollbackRegistry.Lock()
 	defer _customRollbackRegistry.Unlock()
@@ -187,61 +169,6 @@ func ClearAllTaskExecutors() {
 	_taskExecutorRegistry.executors = make(map[string]TaskExecutor)
 }
 
-// _branchRegistry 全局分支注册表（集群框架：dispatcher 从 DB 重建 Task 时恢复分支信息）
-// taskName -> nodeKey -> []*Branch
-var (
-	_branchRegistry = struct {
-		sync.RWMutex
-		branches map[string]map[string][]*Branch
-	}{branches: make(map[string]map[string][]*Branch)}
-)
-
-func registerBranch(taskName, nodeKey string, branch *Branch) {
-	_branchRegistry.Lock()
-	defer _branchRegistry.Unlock()
-	if _branchRegistry.branches[taskName] == nil {
-		_branchRegistry.branches[taskName] = make(map[string][]*Branch)
-	}
-	_branchRegistry.branches[taskName][nodeKey] = append(_branchRegistry.branches[taskName][nodeKey], branch)
-}
-
-func getRegisteredBranches(taskName string) map[string][]*Branch {
-	_branchRegistry.RLock()
-	defer _branchRegistry.RUnlock()
-	return _branchRegistry.branches[taskName]
-}
-
-// _branchConditionProviderRegistry 全局分支条件 Provider 注册表
-// 存储 ExecutorProvider 用于 DB 恢复时重建分支条件（key: "taskName/nodeName/index"）
-var (
-	_branchConditionProviderRegistry = struct {
-		sync.RWMutex
-		providers map[string]executor.ExecutorProvider
-	}{providers: make(map[string]executor.ExecutorProvider)}
-)
-
-// registerBranchConditionProvider 注册分支条件 Provider 到全局注册表
-func registerBranchConditionProvider(taskName, nodeName string, p executor.ExecutorProvider) {
-	_branchConditionProviderRegistry.Lock()
-	defer _branchConditionProviderRegistry.Unlock()
-	idx := 0
-	for {
-		key := fmt.Sprintf("%s/%s/%d", taskName, nodeName, idx)
-		if _, exists := _branchConditionProviderRegistry.providers[key]; !exists {
-			_branchConditionProviderRegistry.providers[key] = p
-			return
-		}
-		idx++
-	}
-}
-
-// getBranchConditionProvider 从全局注册表查找分支条件 Provider
-func getBranchConditionProvider(taskName, nodeName string, index int) executor.ExecutorProvider {
-	_branchConditionProviderRegistry.RLock()
-	defer _branchConditionProviderRegistry.RUnlock()
-	key := fmt.Sprintf("%s/%s/%d", taskName, nodeName, index)
-	return _branchConditionProviderRegistry.providers[key]
-}
 
 // _processorRegistry 全局处理器注册表（集群框架：receiver 从数据库恢复时查找 preProcessor/postProcessor）
 var (
@@ -293,9 +220,9 @@ func getPostProcessor(taskName, subTaskName string) Processor {
 }
 
 // executeBranchCondition reads the branch subtask's Settings, resolves the
-// condition provider from the global registry, executes it, and returns the selected key.
+// condition provider from the global provider registry, executes it, and returns the selected key.
 // Returns the selected end node key on success, or an error.
-func executeBranchCondition(taskName, nodeKey, settingsJSON string, conditionInput any) (string, error) {
+func executeBranchCondition(taskName, subtaskName, nodeKey, settingsJSON string, conditionInput any) (string, error) {
 	if settingsJSON == "" {
 		return "", errors.New("branch: empty settings JSON")
 	}
@@ -308,19 +235,10 @@ func executeBranchCondition(taskName, nodeKey, settingsJSON string, conditionInp
 		return "", errors.New("branch: no BranchConfig in settings")
 	}
 
-	// Resolve condition provider from global registry
-	provider := getBranchConditionProvider(taskName, nodeKey, 0)
+	// Resolve condition provider from global provider registry (registered under branch subtask name)
+	provider := getProvider(taskName, subtaskName)
 	if provider == nil {
-		// Fall back to Condition closure in _branchRegistry (backward compatibility)
-		branches := getRegisteredBranches(taskName)
-		if brs := branches[nodeKey]; len(brs) > 0 && brs[0].Condition != nil {
-			selected, err := brs[0].Condition(nil, conditionInput)
-			if err != nil {
-				return "", fmt.Errorf("branch: condition execution failed: %w", err)
-			}
-			return selected, nil
-		}
-		return "", fmt.Errorf("branch: condition provider not found for %s/%s", taskName, nodeKey)
+		return "", fmt.Errorf("branch: condition provider not found for %s/%s", taskName, subtaskName)
 	}
 
 	// Prepare TaskData with the condition input (parent node output)

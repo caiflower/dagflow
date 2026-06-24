@@ -1,9 +1,9 @@
 workflow: full
-phase: build
-build_mode: null
+phase: verify
+build_mode: subagent-driven-development
 build_pause: null
-isolation: null
-verify_mode: null
+isolation: branch
+verify_mode: full
 base_ref: 1e7dcefa4d78e59159c1a84f759bc6fa024e70dd
 design_doc: docs/superpowers/specs/2026-06-24-node-registry-dashboard-design.md
 plan: docs/superpowers/plans/2026-06-24-node-registry-dashboard.md
@@ -15,3 +15,4 @@ verified_at: null
 archived: false
 handoff_context: openspec/changes/node-registry-dashboard/.comet/handoff/design-context.json
 handoff_hash: b0f951f23124709f969829fdb9ce1b784e2faa501402faed02b97e6f20820b26
+build_command: cd backend && /Users/lijinlong/.gvm/gos/go1.24.13/bin/go build ./... && cd ../frontend && npm run build

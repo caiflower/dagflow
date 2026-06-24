@@ -3,7 +3,7 @@ import type { NodeDetail } from '../api/client';
 import { nodeApi } from '../api/client';
 import Badge from '../components/ui/Badge';
 import Input from '../components/ui/Input';
-import { RefreshCw, Server } from 'lucide-react';
+import { RefreshCw, Server, Loader2 } from 'lucide-react';
 
 function formatHeartbeat(ts: number): string {
   if (!ts) return '-';
@@ -21,6 +21,7 @@ export default function NodeRegistryPage() {
   const [search, setSearch] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState(5);
+  const [initialLoad, setInitialLoad] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(null);
 
   const fetchNodes = async () => {
@@ -33,6 +34,7 @@ export default function NodeRegistryPage() {
       setError(err.message || 'Failed to fetch nodes');
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
   };
 
@@ -114,6 +116,8 @@ export default function NodeRegistryPage() {
               background: 'var(--bg-secondary)',
               color: 'var(--text-primary)',
               border: '1px solid var(--border-subtle)',
+              opacity: loading ? 0.7 : 1,
+              cursor: loading ? 'not-allowed' : 'pointer',
             }}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -156,99 +160,81 @@ export default function NodeRegistryPage() {
         </div>
       )}
 
-      {/* Table */}
-      <div
-        className="rounded-xl overflow-hidden"
-        style={{ border: '1px solid var(--border-subtle)' }}
-      >
-        <table className="w-full text-sm">
-          <thead style={{ background: 'var(--bg-secondary)' }}>
-            <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>
-                Node ID
-              </th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>
-                Address
-              </th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>
-                Functions
-              </th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>
-                Status
-              </th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>
-                Last Heartbeat
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 && !loading && (
-              <tr>
-                <td colSpan={5} className="text-center py-16">
-                  <Server
-                    className="mx-auto mb-3 opacity-20"
-                    size={40}
-                    style={{ color: 'var(--text-muted)' }}
-                  />
-                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                    {search ? 'No nodes match your search' : 'No nodes registered yet'}
-                  </p>
-                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                    {search
-                      ? 'Try a different search term'
-                      : 'Remote function nodes will appear here once they register'}
-                  </p>
-                </td>
+      {/* Table with spinner */}
+      <div className="relative">
+        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
+          <table className="w-full text-sm">
+            <thead style={{ background: 'var(--bg-secondary)' }}>
+              <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>Node ID</th>
+                <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>Address</th>
+                <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>Functions</th>
+                <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>Status</th>
+                <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>Last Heartbeat</th>
               </tr>
-            )}
-            {filtered.map((node) => (
-              <tr
-                key={node.node_id}
-                style={{ borderBottom: '1px solid var(--border-subtle)' }}
-                className="transition-colors duration-100"
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--bg-secondary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '';
-                }}
-              >
-                <td
-                  className="px-4 py-3 font-mono text-xs"
-                  style={{ color: 'var(--text-primary)' }}
+            </thead>
+            <tbody>
+              {initialLoad && (
+                <tr>
+                  <td colSpan={5} className="text-center py-16">
+                    <Loader2 className="mx-auto mb-2 animate-spin" size={24} style={{ color: 'var(--accent-primary)' }} />
+                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading nodes...</p>
+                  </td>
+                </tr>
+              )}
+              {!initialLoad && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="text-center py-16">
+                    <Server className="mx-auto mb-3 opacity-20" size={40} style={{ color: 'var(--text-muted)' }} />
+                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                      {search ? 'No nodes match your search' : 'No nodes registered yet'}
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                      {search ? 'Try a different search term' : 'Remote function nodes will appear here once they register'}
+                    </p>
+                  </td>
+                </tr>
+              )}
+              {!initialLoad && filtered.map((node) => (
+                <tr
+                  key={node.node_id}
+                  style={{ borderBottom: '1px solid var(--border-subtle)' }}
+                  className="transition-colors duration-100"
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}
                 >
-                  {node.node_id}
-                </td>
-                <td
-                  className="px-4 py-3 font-mono text-xs"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  {node.address}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {node.functions.map((fn) => (
-                      <Badge key={fn} variant="subtle">
-                        {fn}
-                      </Badge>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <Badge
-                    variant={node.status === 'online' ? 'success' : 'danger'}
-                    dot
-                  >
-                    {node.status === 'online' ? 'Online' : 'Offline'}
-                  </Badge>
-                </td>
-                <td className="px-4 py-3" style={{ color: 'var(--text-muted)' }}>
-                  {formatHeartbeat(node.last_heartbeat)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--text-primary)' }}>{node.node_id}</td>
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--text-secondary)' }}>{node.address}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {node.functions.map((fn) => (
+                        <Badge key={fn} variant="subtle">{fn}</Badge>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant={node.status === 'online' ? 'success' : 'danger'} dot>
+                      {node.status === 'online' ? 'Online' : 'Offline'}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3" style={{ color: 'var(--text-muted)' }}>
+                    {formatHeartbeat(node.last_heartbeat)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Refresh spinner overlay */}
+        {loading && !initialLoad && (
+          <div
+            className="absolute inset-0 rounded-xl flex items-center justify-center z-10"
+            style={{ background: 'rgba(255,255,255,0.4)' }}
+          >
+            <Loader2 className="animate-spin" size={24} style={{ color: 'var(--accent-primary)' }} />
+          </div>
+        )}
       </div>
     </div>
   );

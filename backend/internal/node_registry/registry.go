@@ -27,15 +27,16 @@ type NodeInfo struct {
 
 type NodeRegistry struct {
 	pb.UnimplementedNodeRegistryServer
-	redis v2.RedisClient
+	redis    v2.RedisClient
+	timeFunc func() time.Time
 }
 
 func NewNodeRegistry(client v2.RedisClient) *NodeRegistry {
-	return &NodeRegistry{redis: client}
+	return &NodeRegistry{redis: client, timeFunc: time.Now}
 }
 
 func (r *NodeRegistry) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
-	now := time.Now().Unix()
+	now := r.timeFunc().Unix()
 	info := NodeInfo{
 		NodeID:        req.NodeId,
 		Address:       req.Address,
@@ -75,7 +76,7 @@ func (r *NodeRegistry) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) 
 		return &pb.HeartbeatResponse{Ok: false}, fmt.Errorf("unmarshal node info: %w", err)
 	}
 
-	info.LastHeartbeat = time.Now().Unix()
+	info.LastHeartbeat = r.timeFunc().Unix()
 
 	newData, err := json.Marshal(info)
 	if err != nil {
@@ -95,7 +96,7 @@ func (r *NodeRegistry) ListNodes(ctx context.Context, _ *pb.ListNodesRequest) (*
 		return nil, fmt.Errorf("redis scan nodes: %w", err)
 	}
 
-	now := time.Now().Unix()
+	now := r.timeFunc().Unix()
 	var items []*pb.NodeDetail
 
 	for _, key := range keys {
@@ -136,7 +137,7 @@ func (r *NodeRegistry) GetNode(ctx context.Context, req *pb.GetNodeRequest) (*pb
 		return nil, fmt.Errorf("unmarshal node info: %w", err)
 	}
 
-	now := time.Now().Unix()
+	now := r.timeFunc().Unix()
 	status := "offline"
 	if now-info.LastHeartbeat < int64(heartbeatThreshold.Seconds()) {
 		status = "online"
@@ -160,7 +161,7 @@ func (r *NodeRegistry) GetNodesForFunc(ctx context.Context, funcName string) ([]
 		return nil, fmt.Errorf("redis smembers func index: %w", err)
 	}
 
-	now := time.Now().Unix()
+	now := r.timeFunc().Unix()
 	var nodes []NodeInfo
 	for _, nodeID := range nodeIDs {
 		nodeKey := keyPrefixNode + nodeID

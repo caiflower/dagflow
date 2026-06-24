@@ -373,3 +373,12 @@ var NodeRegistry_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "proto/remote_executor/remote_executor.proto",
 }
+
+// Exported handler wrappers for engine.GRPC() registration.
+func NodeRegistry_ListNodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	return _NodeRegistry_ListNodes_Handler(srv, ctx, dec, interceptor)
+}
+
+func NodeRegistry_GetNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	return _NodeRegistry_GetNode_Handler(srv, ctx, dec, interceptor)
+}

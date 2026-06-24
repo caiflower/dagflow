@@ -5,6 +5,7 @@ import FlowListPage from './pages/FlowListPage';
 import FlowEditorPage from './pages/FlowEditorPage';
 import ExecutionPage from './pages/ExecutionPage';
 import ProtocolPage from './pages/ProtocolPage';
+import NodeRegistryPage from './pages/NodeRegistryPage';
 import ToastProvider from './components/ui/Toast';
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/flows/:id" element={<FlowEditorPage />} />
             <Route path="/executions" element={<ExecutionPage />} />
             <Route path="/protocols" element={<ProtocolPage />} />
+            <Route path="/nodes" element={<NodeRegistryPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -172,7 +172,7 @@ func TestIntegrationNodeHeartbeatTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	// Fast forward past TTL so the node key expires.
-	mr.FastForward(31 * time.Second)
+	mr.FastForward(6 * time.Minute)
 
 	pool := NewConnPool()
 	pool.conns["bufconn-exp"] = &connEntry{conn: conn, refs: 1}

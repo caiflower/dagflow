@@ -1,11 +1,12 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutList, Play, Plug, Sun, Moon, Workflow } from 'lucide-react';
+import { LayoutList, Play, Plug, Sun, Moon, Workflow, Server } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
 
 const NAV_ITEMS = [
   { path: '/flows', label: 'Flows', icon: LayoutList },
   { path: '/executions', label: '执行', icon: Play },
   { path: '/protocols', label: '协议', icon: Plug },
+  { path: '/nodes', label: '节点管理', icon: Server },
 ];
 
 export default function Layout() {

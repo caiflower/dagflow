@@ -90,4 +90,30 @@ export const executionApi = {
     api.get('/executions', { params: { page, page_size: pageSize, ...(flowId ? { flow_id: flowId } : {}) } }).then(r => unwrap<PageResult<Execution>>(r)),
 };
 
+// Node Registry types
+export interface NodeDetail {
+  nodeId: string;
+  address: string;
+  functions: string[];
+  status: 'online' | 'offline';
+  lastHeartbeat: number;
+}
+
+// Node Registry API
+export const nodeApi = {
+  list: () =>
+    api.get('/nodes').then(r => {
+      const data = r.data;
+      // Handle both unwrapped and wrapped responses
+      if (data.data) return (data.data as { items: NodeDetail[]; total: number }).items || [];
+      return (data as { items: NodeDetail[]; total: number }).items || [];
+    }),
+  get: (id: string) =>
+    api.get(`/nodes/${id}`).then(r => {
+      const data = r.data;
+      if (data.data) return data.data as NodeDetail;
+      return data as NodeDetail;
+    }),
+};
+
 export default api;

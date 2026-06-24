@@ -24,6 +24,8 @@ message HealthResponse { bool ok = 1; }
 service NodeRegistry {
   rpc Register(RegisterRequest) returns (RegisterResponse);
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc ListNodes(ListNodesRequest) returns (ListNodesResponse);
+  rpc GetNode(GetNodeRequest) returns (GetNodeResponse);
 }
 
 message RegisterRequest {
@@ -36,3 +38,26 @@ message RegisterResponse { bool ok = 1; }
 
 message HeartbeatRequest { string node_id = 1; }
 message HeartbeatResponse { bool ok = 1; }
+
+message NodeDetail {
+  string node_id = 1;
+  string address = 2;
+  repeated string functions = 3;
+  string status = 4;
+  int64 last_heartbeat = 5;
+}
+
+message ListNodesRequest {}
+
+message ListNodesResponse {
+  repeated NodeDetail items = 1;
+  int32 total = 2;
+}
+
+message GetNodeRequest {
+  string node_id = 1;
+}
+
+message GetNodeResponse {
+  NodeDetail node = 1;
+}

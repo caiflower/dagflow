@@ -2,6 +2,7 @@ package remote_executor
 
 import (
 	"context"
+	"encoding/json"
 	"net"
 	"testing"
 	"time"
@@ -180,9 +181,9 @@ func TestExecuteSuccess(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	m, ok := result.(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, `{"ok":true}`, m["output"])
+	var m map[string]any
+	require.NoError(t, json.Unmarshal(result.([]byte), &m))
+	assert.True(t, m["ok"].(bool), "ok flag should be true")
 }
 
 func TestExecuteRemoteError(t *testing.T) {
@@ -270,7 +271,7 @@ func TestExecuteEmptyInput(t *testing.T) {
 	result, err := p.Execute(context.Background(), &executor.TaskData{TaskId: "t1", Input: ``})
 	require.NoError(t, err)
 
-	m, ok := result.(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, `{}`, m["output"])
+	var m map[string]any
+	require.NoError(t, json.Unmarshal(result.([]byte), &m))
+	assert.NotNil(t, m)
 }

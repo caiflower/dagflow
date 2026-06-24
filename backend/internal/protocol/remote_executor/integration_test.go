@@ -100,9 +100,9 @@ func TestIntegrationSingleNodeExecute(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	m, ok := result.(map[string]any)
-	require.True(t, ok)
-	assert.Contains(t, m["output"].(string), "echoed")
+	var m map[string]any
+	require.NoError(t, json.Unmarshal(result.([]byte), &m))
+	assert.True(t, m["echoed"].(bool), "echoed flag should be true")
 
 }
 
@@ -148,8 +148,9 @@ func TestIntegrationMultiNodeRandomPick(t *testing.T) {
 
 	result, err := provider.Execute(ctx, &executor.TaskData{TaskId: "task-2", Input: `{}`})
 	require.NoError(t, err)
-	m := result.(map[string]any)
-	assert.Contains(t, m["output"].(string), "node-")
+	var m map[string]any
+	require.NoError(t, json.Unmarshal(result.([]byte), &m))
+	assert.Contains(t, m["node"].(string), "node-")
 
 }
 

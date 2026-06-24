@@ -2,6 +2,8 @@
 comet_change: node-registry-dashboard
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-24-node-registry-dashboard
+status: final
 ---
 
 # Node Registry Dashboard — Technical Design

@@ -2,6 +2,7 @@
 change: node-registry-dashboard
 design-doc: docs/superpowers/specs/2026-06-24-node-registry-dashboard-design.md
 base-ref: 1e7dcefa4d78e59159c1a84f759bc6fa024e70dd
+archived-with: 2026-06-24-node-registry-dashboard
 ---
 
 # Node Registry Dashboard Implementation Plan
@@ -23,6 +24,7 @@ base-ref: 1e7dcefa4d78e59159c1a84f759bc6fa024e70dd
 - Routes: `/nodes` for dashboard page
 - Go test files in same package as implementation
 
+archived-with: 2026-06-24-node-registry-dashboard
 ---
 
 ### Task 1: Proto Definition
@@ -92,6 +94,7 @@ git add backend/proto/remote_executor/
 git commit -m "feat: add ListNodes/GetNode RPCs to NodeRegistry proto"
 ```
 
+archived-with: 2026-06-24-node-registry-dashboard
 ---
 
 ### Task 2: Unified Node Storage Refactoring
@@ -318,6 +321,7 @@ git add backend/internal/node_registry/registry.go
 git commit -m "refactor: unified node storage with lastHeartbeat and function index"
 ```
 
+archived-with: 2026-06-24-node-registry-dashboard
 ---
 
 ### Task 3: Backend Tests
@@ -468,6 +472,7 @@ git add backend/internal/node_registry/registry_test.go
 git commit -m "test: add tests for ListNodes, GetNode, function index, offline status"
 ```
 
+archived-with: 2026-06-24-node-registry-dashboard
 ---
 
 ### Task 4: HTTP Routes
@@ -546,6 +551,7 @@ git add backend/internal/api/router.go backend/cmd/server/main.go
 git commit -m "feat: add HTTP routes for node registry list/get"
 ```
 
+archived-with: 2026-06-24-node-registry-dashboard
 ---
 
 ### Task 5: Frontend — API Client
@@ -594,6 +600,7 @@ git add frontend/src/api/client.ts
 git commit -m "feat: add node registry API client functions"
 ```
 
+archived-with: 2026-06-24-node-registry-dashboard
 ---
 
 ### Task 6: Frontend — Node Registry Page
@@ -854,6 +861,7 @@ git add frontend/src/
 git commit -m "feat: add Node Registry dashboard page with search and auto-refresh"
 ```
 
+archived-with: 2026-06-24-node-registry-dashboard
 ---
 
 ### Task 7: Final Verification

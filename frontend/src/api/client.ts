@@ -92,11 +92,11 @@ export const executionApi = {
 
 // Node Registry types
 export interface NodeDetail {
-  nodeId: string;
+  node_id: string;
   address: string;
   functions: string[];
   status: 'online' | 'offline';
-  lastHeartbeat: number;
+  last_heartbeat: number;
 }
 
 // Node Registry API

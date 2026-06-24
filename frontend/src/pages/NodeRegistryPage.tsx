@@ -54,7 +54,7 @@ export default function NodeRegistryPage() {
     const s = search.toLowerCase();
     return nodes.filter(
       (n) =>
-        n.nodeId.toLowerCase().includes(s) ||
+        n.node_id.toLowerCase().includes(s) ||
         n.address.toLowerCase().includes(s) ||
         n.functions.some((f) => f.toLowerCase().includes(s))
     );
@@ -203,7 +203,7 @@ export default function NodeRegistryPage() {
             )}
             {filtered.map((node) => (
               <tr
-                key={node.nodeId}
+                key={node.node_id}
                 style={{ borderBottom: '1px solid var(--border-subtle)' }}
                 className="transition-colors duration-100"
                 onMouseEnter={(e) => {
@@ -217,7 +217,7 @@ export default function NodeRegistryPage() {
                   className="px-4 py-3 font-mono text-xs"
                   style={{ color: 'var(--text-primary)' }}
                 >
-                  {node.nodeId}
+                  {node.node_id}
                 </td>
                 <td
                   className="px-4 py-3 font-mono text-xs"
@@ -243,7 +243,7 @@ export default function NodeRegistryPage() {
                   </Badge>
                 </td>
                 <td className="px-4 py-3" style={{ color: 'var(--text-muted)' }}>
-                  {formatHeartbeat(node.lastHeartbeat)}
+                  {formatHeartbeat(node.last_heartbeat)}
                 </td>
               </tr>
             ))}

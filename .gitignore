@@ -32,3 +32,4 @@ hertz
 **/*.db
 go.work*backend/server
 backend/server
+.DS_Store

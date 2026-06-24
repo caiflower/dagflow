@@ -1,10 +1,15 @@
 package api
 
+import (
+	"github.com/caiflower/dagflow/internal/node_registry"
+)
+
 // gRPC 服务实例（包级变量，由 main.go 设置）
 var (
-	flowGrpcSvc     *FlowGrpcService
-	protocolGrpcSvc *ProtocolGrpcService
+	flowGrpcSvc      *FlowGrpcService
+	protocolGrpcSvc  *ProtocolGrpcService
 	executionGrpcSvc *ExecutionGrpcService
+	nodeRegSvc       *node_registry.NodeRegistry
 )
 
 // SetFlowGrpcService 设置 Flow gRPC 服务
@@ -20,6 +25,11 @@ func SetProtocolGrpcService(svc *ProtocolGrpcService) {
 // SetExecutionGrpcService 设置 Execution gRPC 服务
 func SetExecutionGrpcService(svc *ExecutionGrpcService) {
 	executionGrpcSvc = svc
+}
+
+// SetNodeRegistryService 设置 Node Registry 服务
+func SetNodeRegistryService(svc *node_registry.NodeRegistry) {
+	nodeRegSvc = svc
 }
 
 // GetFlowGrpcService 获取 Flow gRPC 服务

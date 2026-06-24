@@ -18,11 +18,18 @@ package api
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/caiflower/common-tools/web"
 
 	pb "github.com/caiflower/dagflow/internal/proto"
+	remote_executor "github.com/caiflower/dagflow/proto/remote_executor"
 )
+
+// GetNodeReq 获取节点请求
+type GetNodeReq struct {
+	ID string `path:"id" verf:"required"`
+}
 
 // RegisterRoutes 注册所有 API 路由（统一 gRPC handler 方式）
 func RegisterRoutes(engine *web.Engine) {
@@ -49,8 +56,32 @@ func RegisterRoutes(engine *web.Engine) {
 	v1.GRPC("GET", "/executions/:id", pb.Execution_Get_Handler, executionGrpcSvc)
 	v1.GRPC("GET", "/executions", pb.Execution_List_Handler, executionGrpcSvc)
 
+	// ===== Node Registry Service =====
+	v1.GET("/nodes", listNodesHandler)
+	v1.GET("/nodes/:id", getNodeHandler)
+
 	// 健康检查
 	v1.GET("/health", healthCheck)
+}
+
+// listNodesHandler 列出所有注册节点
+func listNodesHandler(ctx context.Context) (*remote_executor.ListNodesResponse, error) {
+	if nodeRegSvc == nil {
+		return nil, fmt.Errorf("node registry not initialized")
+	}
+	return nodeRegSvc.ListNodes(ctx, &remote_executor.ListNodesRequest{})
+}
+
+// getNodeHandler 获取单个节点详情
+func getNodeHandler(ctx context.Context, req *GetNodeReq) (*remote_executor.NodeDetail, error) {
+	if nodeRegSvc == nil {
+		return nil, fmt.Errorf("node registry not initialized")
+	}
+	resp, err := nodeRegSvc.GetNode(ctx, &remote_executor.GetNodeRequest{NodeId: req.ID})
+	if err != nil {
+		return nil, err
+	}
+	return resp.Node, nil
 }
 
 // healthCheck 健康检查

@@ -161,6 +161,7 @@ func initGrpcServices() {
 
 	nodeReg = node_registry.NewNodeRegistry(redisClient)
 	service.SetNodeRegistry(nodeReg)
+	api.SetNodeRegistryService(nodeReg)
 
 	// Start unified gRPC server as daemon (managed by global.ResourceManger)
 	startGrpcServer()

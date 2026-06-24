@@ -265,9 +265,10 @@ func buildNodeStatuses(flowNodes []converter.FlowNode, flowEdges []converter.Flo
 		}
 
 		// 从 taskx Subtask 获取状态和详情
-		st, ok := subtaskMap[fn.Name]
-		if !ok && fn.Type == "branch" {
-			st, ok = subtaskMap["branch_"+fn.Name]
+		// subtask TaskName = flow 节点 ID（converter 转换规则）
+		st, ok := subtaskMap[fn.ID]
+		if !ok {
+			st, ok = subtaskMap[fn.Name]
 		}
 		if ok {
 			ns.State = mapTaskxState(st.State)

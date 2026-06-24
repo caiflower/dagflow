@@ -480,9 +480,12 @@ func (t *Task) AddBranch(node *Subtask, branch *Branch) error {
 		providerName = string(branch.ConditionProvider.Protocol())
 	}
 
+	name := branch.Name
+	if name == "" {
+		name = fmt.Sprintf("branch_%s", node.GetName())
+	}
 	// Create branch subtask (will be persisted as a regular subtask row)
-	branchSubtask := NewSubtask(
-		fmt.Sprintf("branch_%s", node.GetName()), nil)
+	branchSubtask := NewSubtask(name, nil)
 	branchSubtask.subtask.ID = fmt.Sprintf("branch_%s_%d", node.GetID(), len(t.dag.branches[node.GetID()]))
 	branchSubtask.subtask.Settings = tools.ToJson(SubtaskSettings{
 		BranchConfig: &BranchConfig{
@@ -546,7 +549,7 @@ func (p *nameResolvingProvider) Execute(ctx context.Context, data *executor.Task
 	if err != nil {
 		return nil, err
 	}
-	if s, ok := result.(string); ok {
+	if s := resultToString(result); s != "" {
 		return p.resolve(s), nil
 	}
 	return result, nil

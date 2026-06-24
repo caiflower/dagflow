@@ -674,10 +674,11 @@ func (t *taskDispatcher) processBranches(ctx context.Context, task *Task) {
 			var condErr error
 			if execErr != nil {
 				condErr = execErr
-			} else if s, ok := result.(string); ok {
-				selectedKey = s
 			} else {
-				condErr = fmt.Errorf("branch ConditionProvider returned non-string result: %v", result)
+				selectedKey = resultToString(result)
+				if selectedKey == "" {
+					condErr = fmt.Errorf("branch ConditionProvider returned non-string result: %v", result)
+				}
 			}
 
 			if condErr != nil {

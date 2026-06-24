@@ -190,6 +190,7 @@ type BranchConfig struct {
 
 // Branch 条件分支
 type Branch struct {
+	Name string
 	// ConditionProvider 可持久化的条件执行器，Execute 返回选中的目标节点 key (string)
 	ConditionProvider executor.ExecutorProvider
 	// EndNodes 分支目标节点集合

@@ -112,7 +112,7 @@ func FlowToTaskWithNodes(name string, nodes []FlowNode, edges []FlowEdge, provid
 			return nil, fmt.Errorf("node %s: %w", n.Name, err)
 		}
 
-		st := taskx.NewSubtask(n.Name, provider)
+		st := taskx.NewSubtask(n.ID, provider)
 		if input, ok := nodeInputs[n.Name]; ok && input != "" {
 			st.SetInput(input)
 		}
@@ -177,7 +177,7 @@ func FlowToTaskWithNodes(name string, nodes []FlowNode, edges []FlowEdge, provid
 		for targetID := range succNames {
 			for _, n := range nodes {
 				if n.ID == targetID && n.Type == "task" {
-					resolvedEndNodes[n.Name] = true
+					resolvedEndNodes[n.ID] = true
 					break
 				}
 			}
@@ -189,7 +189,9 @@ func FlowToTaskWithNodes(name string, nodes []FlowNode, edges []FlowEdge, provid
 			if !ok {
 				continue
 			}
-			if err := task.AddBranch(predSt, taskx.NewBranch(bi.provider, resolvedEndNodes)); err != nil {
+			branch := taskx.NewBranch(bi.provider, resolvedEndNodes)
+			branch.Name = bi.node.ID
+			if err := task.AddBranch(predSt, branch); err != nil {
 				return nil, fmt.Errorf("add branch %s: %w", bi.node.Name, err)
 			}
 		}

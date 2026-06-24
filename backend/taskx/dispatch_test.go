@@ -609,9 +609,9 @@ func submitBranchTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, done cha
 	_ = task.AddEdge(pathB, end)
 	_ = task.AddBranch(start, &Branch{
 		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
-			return pathA.GetID(), nil
+			return "pathA", nil
 		}),
-		EndNodes: map[string]bool{pathA.GetID(): true, pathB.GetID(): true},
+		EndNodes: map[string]bool{"pathA": true, "pathB": true},
 	})
 
 	_, err := task.Compile()
@@ -654,15 +654,15 @@ func submitNestedBranchTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, do
 	_ = task.AddEdge(outerB, end)
 	_ = task.AddBranch(start, &Branch{
 		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
-			return outerA.GetID(), nil
+			return "outerA", nil
 		}),
-		EndNodes: map[string]bool{outerA.GetID(): true, outerB.GetID(): true},
+		EndNodes: map[string]bool{"outerA": true, "outerB": true},
 	})
 	_ = task.AddBranch(outerA, &Branch{
 		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
-			return innerA1.GetID(), nil
+			return "innerA1", nil
 		}),
-		EndNodes: map[string]bool{innerA1.GetID(): true, innerA2.GetID(): true},
+		EndNodes: map[string]bool{"innerA1": true, "innerA2": true},
 	})
 
 	_, err := task.Compile()

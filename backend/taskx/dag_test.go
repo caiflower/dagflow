@@ -294,7 +294,7 @@ func TestCompile_InvalidBranchEndNode(t *testing.T) {
 
 	err := g.AddBranch("a", &Branch{
 		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) { return "c", nil }),
-		EndNodes:  map[string]bool{"c": true}, // c 不存在
+		EndNodes:          map[string]bool{"c": true}, // c 不存在
 	})
 	assert.Nil(t, err)
 
@@ -1211,6 +1211,81 @@ func TestTask_OldAPICompatibility(t *testing.T) {
 }
 
 // ===== 类型兼容性校验测试 =====
+
+// TestTask_BranchWithNameResolution 验证分支条件通过名称选择后续节点
+func TestTask_BranchWithNameResolution(t *testing.T) {
+	task := NewTask("testBranchNameResolve")
+
+	start := NewSubtask("start", executor.NewLocalExecutor(echoInput)).SetInput(map[string]any{"name": "start"})
+	pathA := NewSubtask("pathA", executor.NewLocalExecutor(echoInput)).SetInput(map[string]any{"name": "pathA"})
+	pathB := NewSubtask("pathB", executor.NewLocalExecutor(echoInput)).SetInput(map[string]any{"name": "pathB"})
+	end := NewSubtask("end", executor.NewLocalExecutor(echoInput)).SetInput(map[string]any{"name": "end"})
+
+	_ = task.AddSubtask(start)
+	_ = task.AddSubtask(pathA)
+	_ = task.AddSubtask(pathB)
+	_ = task.AddSubtask(end)
+	_ = task.AddEdge(start, pathA)
+	_ = task.AddEdge(start, pathB)
+	_ = task.AddEdge(pathA, end)
+	_ = task.AddEdge(pathB, end)
+
+	// Use NAME-based branch selection
+	_ = task.AddBranch(start, &Branch{
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input any) (string, error) {
+			return "pathA", nil // return name, not ID
+		}),
+		EndNodes: map[string]bool{"pathA": true, "pathB": true}, // names, not IDs
+	})
+
+	_, err := task.Compile()
+	assert.NoError(t, err)
+
+	// start executes first
+	next := task.NextSubTasks()
+	assert.Equal(t, 1, len(next))
+	assert.Equal(t, "start", next[0].GetName())
+
+	_ = task.UpdateSubtaskState(start.GetID(), NodeSucceeded)
+
+	// After start, branch subtask is next
+	next = task.NextSubTasks()
+	assert.Equal(t, 1, len(next))
+	assert.True(t, strings.HasPrefix(next[0].GetName(), "branch_"), "branch subtask should be next after start")
+
+	// Execute the branch condition via executeBranchCondition
+	branchSubtask := next[0]
+	selectedKey, err := executeBranchCondition(
+		task.task.TaskName,
+		branchSubtask.GetName(),
+		branchSubtask.GetID(),
+		branchSubtask.subtask.Settings,
+		"",
+	)
+	assert.NoError(t, err)
+	assert.Equal(t, pathA.GetID(), selectedKey, "branch condition should resolve name 'pathA' to ID")
+
+	// Simulate branch execution result
+	_ = task.UpdateSubtaskState(branchSubtask.GetID(), NodeSucceeded)
+	_ = task.SkipSubtask(pathB.GetID())
+
+	// Only pathA should be executable
+	next = task.NextSubTasks()
+	assert.Equal(t, 1, len(next))
+	assert.Equal(t, "pathA", next[0].GetName())
+}
+
+func TestResultToString(t *testing.T) {
+	// Native string
+	assert.Equal(t, "echo", resultToString("echo"))
+	// JSON-encoded string (remote provider returns this)
+	assert.Equal(t, "echo", resultToString([]byte(`"echo"`)))
+	// Raw bytes (fallback)
+	assert.Equal(t, "raw", resultToString([]byte("raw")))
+	// nil / unknown type
+	assert.Equal(t, "", resultToString(nil))
+	assert.Equal(t, "", resultToString(123))
+}
 
 func TestCompile_TypeMismatch(t *testing.T) {
 	task := NewTask("type-mismatch-test")

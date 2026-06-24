@@ -133,7 +133,6 @@ func ClearProviders(taskName string) {
 		}
 	}
 
-
 	_customRollbackRegistry.Lock()
 	defer _customRollbackRegistry.Unlock()
 	delete(_customRollbackRegistry.funcs, taskName)
@@ -148,7 +147,6 @@ func ClearAllProviders() {
 	_rollbackRegistry.Lock()
 	defer _rollbackRegistry.Unlock()
 	_rollbackRegistry.providers = make(map[string]executor.ExecutorProvider)
-
 
 	_customRollbackRegistry.Lock()
 	defer _customRollbackRegistry.Unlock()
@@ -168,7 +166,6 @@ func ClearAllTaskExecutors() {
 	defer _taskExecutorRegistry.Unlock()
 	_taskExecutorRegistry.executors = make(map[string]TaskExecutor)
 }
-
 
 // _processorRegistry 全局处理器注册表（集群框架：receiver 从数据库恢复时查找 preProcessor/postProcessor）
 var (
@@ -222,6 +219,26 @@ func getPostProcessor(taskName, subTaskName string) Processor {
 // executeBranchCondition reads the branch subtask's Settings, resolves the
 // condition provider from the global provider registry, executes it, and returns the selected key.
 // Returns the selected end node key on success, or an error.
+
+// resultToString converts a provider result to string.
+// For remote providers (SDK), the result is JSON-encoded bytes (e.g. `"echo"`).
+// For local providers, the result is the native Go string.
+func resultToString(result any) string {
+	switch v := result.(type) {
+	case string:
+		return v
+	case []byte:
+		// Remote providers return JSON-encoded output; try to decode as string first.
+		var s string
+		if err := tools.Unmarshal(v, &s); err == nil {
+			return s
+		}
+		return string(v)
+	default:
+		return ""
+	}
+}
+
 func executeBranchCondition(taskName, subtaskName, nodeKey, settingsJSON string, conditionInput any) (string, error) {
 	if settingsJSON == "" {
 		return "", errors.New("branch: empty settings JSON")
@@ -256,8 +273,8 @@ func executeBranchCondition(taskName, subtaskName, nodeKey, settingsJSON string,
 		return "", fmt.Errorf("branch: condition execution failed: %w", err)
 	}
 
-	selected, ok := result.(string)
-	if !ok {
+	selected := resultToString(result)
+	if selected == "" {
 		return "", fmt.Errorf("branch: condition returned non-string result: %v", result)
 	}
 

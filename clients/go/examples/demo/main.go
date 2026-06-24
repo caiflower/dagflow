@@ -37,7 +37,7 @@ func echo(ctx context.Context, input string) (string, error) {
 
 func branchSelect(ctx context.Context, input json.RawMessage) (string, error) {
 	fmt.Printf("Branch: selecting 'echo', input=%s\n", string(input))
-	return "echo", nil
+	return "task_1782107729290", nil
 }
 
 func processImage1(ctx context.Context, input ImageInput) (ImageOutput, error) {

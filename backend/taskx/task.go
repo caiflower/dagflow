@@ -1226,19 +1226,55 @@ func (t *Task) initByBean(taskBean *model.Task, subtaskBeans []model.Subtask, ed
 			}
 		}
 	}
-	// Restore branch info from global registry
-	// Prefer ConditionProvider (persistable), fall back to Condition closure (backward compatibility)
+	// Restore branches from DB: scan branch subtasks' Settings.BranchConfig.
+	// This works after service restart because branch metadata is persisted.
+	// Build a name→ID map for resolving end node names from BranchConfig.
+	nameToID := make(map[string]string)
+	for id, s := range t.subtaskMap {
+		nameToID[s.GetName()] = id
+	}
+	for _, subtask := range t.subtaskMap {
+		if !strings.HasPrefix(subtask.GetID(), "branch_") {
+			continue
+		}
+		if subtask.subtask.Settings == "" {
+			continue
+		}
+		var settings SubtaskSettings
+		if err := tools.Unmarshal([]byte(subtask.subtask.Settings), &settings); err != nil || settings.BranchConfig == nil {
+			continue
+		}
+
+		endNodes := make(map[string]bool)
+		for _, name := range settings.BranchConfig.EndNodes {
+			if id, ok := nameToID[name]; ok {
+				endNodes[id] = true
+			}
+		}
+
+		branch := &Branch{
+			EndNodes: endNodes,
+		}
+		if p := getBranchConditionProvider(taskBean.TaskName, subtask.GetID(), 0); p != nil {
+			branch.ConditionProvider = p
+		}
+
+		t.dag.branches[subtask.GetID()] = append(t.dag.branches[subtask.GetID()], branch)
+	}
+
+	// Also restore from global memory registry (legacy fallback / additional data).
 	if registeredBranches := getRegisteredBranches(taskBean.TaskName); len(registeredBranches) > 0 {
 		for nodeKey, branches := range registeredBranches {
 			for i, br := range branches {
-				// If Branch has a ConditionProvider, restore from the new registry
 				if br.ConditionProvider == nil && br.Condition == nil {
 					if p := getBranchConditionProvider(taskBean.TaskName, nodeKey, i); p != nil {
 						br.ConditionProvider = p
 					}
 				}
 			}
-			t.dag.branches[nodeKey] = branches
+			if _, exists := t.dag.branches[nodeKey]; !exists {
+				t.dag.branches[nodeKey] = branches
+			}
 		}
 	}
 	// Compile DAG

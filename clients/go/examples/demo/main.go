@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -29,6 +30,24 @@ func processImage(ctx context.Context, input ImageInput) (ImageOutput, error) {
 	}, nil
 }
 
+func echo(ctx context.Context, input string) (string, error) {
+	fmt.Printf("Echo: %s\n", input)
+	return input, nil
+}
+
+func branchSelect(ctx context.Context, input json.RawMessage) (string, error) {
+	fmt.Printf("Branch: selecting 'echo', input=%s\n", string(input))
+	return "echo", nil
+}
+
+func processImage1(ctx context.Context, input ImageInput) (ImageOutput, error) {
+	fmt.Printf("Processing image1: %s (%dx%d)\n", input.URL, input.Width, input.Height)
+	return ImageOutput{
+		ProcessedURL: input.URL + "?processed=v1",
+		Size:         int64(input.Width * input.Height * 8),
+	}, nil
+}
+
 func main() {
 	s := sdk.New(sdk.Config{
 		NodeID:     "demo-node-1",
@@ -37,6 +56,9 @@ func main() {
 	})
 
 	sdk.Register(s, "processImage", processImage)
+	sdk.Register(s, "echo", echo)
+	sdk.Register(s, "branch", branchSelect)
+	sdk.Register(s, "processImage1", processImage1)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

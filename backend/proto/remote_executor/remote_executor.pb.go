@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.34.1
-// source: proto/remote_executor/remote_executor.proto
+// source: remote_executor.proto
 
 package remote_executor
 
@@ -32,7 +32,7 @@ type ExecuteRequest struct {
 
 func (x *ExecuteRequest) Reset() {
 	*x = ExecuteRequest{}
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[0]
+	mi := &file_remote_executor_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44,7 +44,7 @@ func (x *ExecuteRequest) String() string {
 func (*ExecuteRequest) ProtoMessage() {}
 
 func (x *ExecuteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[0]
+	mi := &file_remote_executor_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -57,7 +57,7 @@ func (x *ExecuteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecuteRequest.ProtoReflect.Descriptor instead.
 func (*ExecuteRequest) Descriptor() ([]byte, []int) {
-	return file_proto_remote_executor_remote_executor_proto_rawDescGZIP(), []int{0}
+	return file_remote_executor_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *ExecuteRequest) GetFuncName() string {
@@ -91,7 +91,7 @@ type ExecuteResponse struct {
 
 func (x *ExecuteResponse) Reset() {
 	*x = ExecuteResponse{}
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[1]
+	mi := &file_remote_executor_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -103,7 +103,7 @@ func (x *ExecuteResponse) String() string {
 func (*ExecuteResponse) ProtoMessage() {}
 
 func (x *ExecuteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[1]
+	mi := &file_remote_executor_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -116,7 +116,7 @@ func (x *ExecuteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecuteResponse.ProtoReflect.Descriptor instead.
 func (*ExecuteResponse) Descriptor() ([]byte, []int) {
-	return file_proto_remote_executor_remote_executor_proto_rawDescGZIP(), []int{1}
+	return file_remote_executor_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ExecuteResponse) GetOutput() []byte {
@@ -141,7 +141,7 @@ type HealthRequest struct {
 
 func (x *HealthRequest) Reset() {
 	*x = HealthRequest{}
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[2]
+	mi := &file_remote_executor_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -153,7 +153,7 @@ func (x *HealthRequest) String() string {
 func (*HealthRequest) ProtoMessage() {}
 
 func (x *HealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[2]
+	mi := &file_remote_executor_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -166,7 +166,7 @@ func (x *HealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
 func (*HealthRequest) Descriptor() ([]byte, []int) {
-	return file_proto_remote_executor_remote_executor_proto_rawDescGZIP(), []int{2}
+	return file_remote_executor_proto_rawDescGZIP(), []int{2}
 }
 
 type HealthResponse struct {
@@ -178,7 +178,7 @@ type HealthResponse struct {
 
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[3]
+	mi := &file_remote_executor_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -190,7 +190,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[3]
+	mi := &file_remote_executor_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -203,7 +203,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_proto_remote_executor_remote_executor_proto_rawDescGZIP(), []int{3}
+	return file_remote_executor_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *HealthResponse) GetOk() bool {
@@ -224,7 +224,7 @@ type RegisterRequest struct {
 
 func (x *RegisterRequest) Reset() {
 	*x = RegisterRequest{}
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[4]
+	mi := &file_remote_executor_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -236,7 +236,7 @@ func (x *RegisterRequest) String() string {
 func (*RegisterRequest) ProtoMessage() {}
 
 func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[4]
+	mi := &file_remote_executor_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -249,7 +249,7 @@ func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterRequest.ProtoReflect.Descriptor instead.
 func (*RegisterRequest) Descriptor() ([]byte, []int) {
-	return file_proto_remote_executor_remote_executor_proto_rawDescGZIP(), []int{4}
+	return file_remote_executor_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *RegisterRequest) GetNodeId() string {
@@ -282,7 +282,7 @@ type RegisterResponse struct {
 
 func (x *RegisterResponse) Reset() {
 	*x = RegisterResponse{}
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[5]
+	mi := &file_remote_executor_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -294,7 +294,7 @@ func (x *RegisterResponse) String() string {
 func (*RegisterResponse) ProtoMessage() {}
 
 func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[5]
+	mi := &file_remote_executor_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -307,7 +307,7 @@ func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterResponse.ProtoReflect.Descriptor instead.
 func (*RegisterResponse) Descriptor() ([]byte, []int) {
-	return file_proto_remote_executor_remote_executor_proto_rawDescGZIP(), []int{5}
+	return file_remote_executor_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *RegisterResponse) GetOk() bool {
@@ -326,7 +326,7 @@ type HeartbeatRequest struct {
 
 func (x *HeartbeatRequest) Reset() {
 	*x = HeartbeatRequest{}
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[6]
+	mi := &file_remote_executor_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -338,7 +338,7 @@ func (x *HeartbeatRequest) String() string {
 func (*HeartbeatRequest) ProtoMessage() {}
 
 func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[6]
+	mi := &file_remote_executor_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -351,7 +351,7 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_proto_remote_executor_remote_executor_proto_rawDescGZIP(), []int{6}
+	return file_remote_executor_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *HeartbeatRequest) GetNodeId() string {
@@ -370,7 +370,7 @@ type HeartbeatResponse struct {
 
 func (x *HeartbeatResponse) Reset() {
 	*x = HeartbeatResponse{}
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[7]
+	mi := &file_remote_executor_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -382,7 +382,7 @@ func (x *HeartbeatResponse) String() string {
 func (*HeartbeatResponse) ProtoMessage() {}
 
 func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[7]
+	mi := &file_remote_executor_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -395,7 +395,7 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_proto_remote_executor_remote_executor_proto_rawDescGZIP(), []int{7}
+	return file_remote_executor_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *HeartbeatResponse) GetOk() bool {
@@ -418,7 +418,7 @@ type NodeDetail struct {
 
 func (x *NodeDetail) Reset() {
 	*x = NodeDetail{}
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[8]
+	mi := &file_remote_executor_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -430,7 +430,7 @@ func (x *NodeDetail) String() string {
 func (*NodeDetail) ProtoMessage() {}
 
 func (x *NodeDetail) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[8]
+	mi := &file_remote_executor_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -443,7 +443,7 @@ func (x *NodeDetail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeDetail.ProtoReflect.Descriptor instead.
 func (*NodeDetail) Descriptor() ([]byte, []int) {
-	return file_proto_remote_executor_remote_executor_proto_rawDescGZIP(), []int{8}
+	return file_remote_executor_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *NodeDetail) GetNodeId() string {
@@ -489,7 +489,7 @@ type ListNodesRequest struct {
 
 func (x *ListNodesRequest) Reset() {
 	*x = ListNodesRequest{}
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[9]
+	mi := &file_remote_executor_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -501,7 +501,7 @@ func (x *ListNodesRequest) String() string {
 func (*ListNodesRequest) ProtoMessage() {}
 
 func (x *ListNodesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[9]
+	mi := &file_remote_executor_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -514,7 +514,7 @@ func (x *ListNodesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListNodesRequest.ProtoReflect.Descriptor instead.
 func (*ListNodesRequest) Descriptor() ([]byte, []int) {
-	return file_proto_remote_executor_remote_executor_proto_rawDescGZIP(), []int{9}
+	return file_remote_executor_proto_rawDescGZIP(), []int{9}
 }
 
 type ListNodesResponse struct {
@@ -527,7 +527,7 @@ type ListNodesResponse struct {
 
 func (x *ListNodesResponse) Reset() {
 	*x = ListNodesResponse{}
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[10]
+	mi := &file_remote_executor_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -539,7 +539,7 @@ func (x *ListNodesResponse) String() string {
 func (*ListNodesResponse) ProtoMessage() {}
 
 func (x *ListNodesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[10]
+	mi := &file_remote_executor_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -552,7 +552,7 @@ func (x *ListNodesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListNodesResponse.ProtoReflect.Descriptor instead.
 func (*ListNodesResponse) Descriptor() ([]byte, []int) {
-	return file_proto_remote_executor_remote_executor_proto_rawDescGZIP(), []int{10}
+	return file_remote_executor_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListNodesResponse) GetItems() []*NodeDetail {
@@ -578,7 +578,7 @@ type GetNodeRequest struct {
 
 func (x *GetNodeRequest) Reset() {
 	*x = GetNodeRequest{}
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[11]
+	mi := &file_remote_executor_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -590,7 +590,7 @@ func (x *GetNodeRequest) String() string {
 func (*GetNodeRequest) ProtoMessage() {}
 
 func (x *GetNodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[11]
+	mi := &file_remote_executor_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -603,7 +603,7 @@ func (x *GetNodeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNodeRequest.ProtoReflect.Descriptor instead.
 func (*GetNodeRequest) Descriptor() ([]byte, []int) {
-	return file_proto_remote_executor_remote_executor_proto_rawDescGZIP(), []int{11}
+	return file_remote_executor_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetNodeRequest) GetNodeId() string {
@@ -622,7 +622,7 @@ type GetNodeResponse struct {
 
 func (x *GetNodeResponse) Reset() {
 	*x = GetNodeResponse{}
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[12]
+	mi := &file_remote_executor_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -634,7 +634,7 @@ func (x *GetNodeResponse) String() string {
 func (*GetNodeResponse) ProtoMessage() {}
 
 func (x *GetNodeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_remote_executor_remote_executor_proto_msgTypes[12]
+	mi := &file_remote_executor_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -647,7 +647,7 @@ func (x *GetNodeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNodeResponse.ProtoReflect.Descriptor instead.
 func (*GetNodeResponse) Descriptor() ([]byte, []int) {
-	return file_proto_remote_executor_remote_executor_proto_rawDescGZIP(), []int{12}
+	return file_remote_executor_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetNodeResponse) GetNode() *NodeDetail {
@@ -657,11 +657,11 @@ func (x *GetNodeResponse) GetNode() *NodeDetail {
 	return nil
 }
 
-var File_proto_remote_executor_remote_executor_proto protoreflect.FileDescriptor
+var File_remote_executor_proto protoreflect.FileDescriptor
 
-const file_proto_remote_executor_remote_executor_proto_rawDesc = "" +
+const file_remote_executor_proto_rawDesc = "" +
 	"\n" +
-	"+proto/remote_executor/remote_executor.proto\x12\x17dagflow.remote_executor\"\\\n" +
+	"\x15remote_executor.proto\x12\x17dagflow.remote_executor\"\\\n" +
 	"\x0eExecuteRequest\x12\x1b\n" +
 	"\tfunc_name\x18\x01 \x01(\tR\bfuncName\x12\x14\n" +
 	"\x05input\x18\x02 \x01(\fR\x05input\x12\x17\n" +
@@ -707,19 +707,19 @@ const file_proto_remote_executor_remote_executor_proto_rawDesc = "" +
 	"\aGetNode\x12'.dagflow.remote_executor.GetNodeRequest\x1a(.dagflow.remote_executor.GetNodeResponseB4Z2github.com/caiflower/dagflow/proto/remote_executorb\x06proto3"
 
 var (
-	file_proto_remote_executor_remote_executor_proto_rawDescOnce sync.Once
-	file_proto_remote_executor_remote_executor_proto_rawDescData []byte
+	file_remote_executor_proto_rawDescOnce sync.Once
+	file_remote_executor_proto_rawDescData []byte
 )
 
-func file_proto_remote_executor_remote_executor_proto_rawDescGZIP() []byte {
-	file_proto_remote_executor_remote_executor_proto_rawDescOnce.Do(func() {
-		file_proto_remote_executor_remote_executor_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_remote_executor_remote_executor_proto_rawDesc), len(file_proto_remote_executor_remote_executor_proto_rawDesc)))
+func file_remote_executor_proto_rawDescGZIP() []byte {
+	file_remote_executor_proto_rawDescOnce.Do(func() {
+		file_remote_executor_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_remote_executor_proto_rawDesc), len(file_remote_executor_proto_rawDesc)))
 	})
-	return file_proto_remote_executor_remote_executor_proto_rawDescData
+	return file_remote_executor_proto_rawDescData
 }
 
-var file_proto_remote_executor_remote_executor_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
-var file_proto_remote_executor_remote_executor_proto_goTypes = []any{
+var file_remote_executor_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_remote_executor_proto_goTypes = []any{
 	(*ExecuteRequest)(nil),    // 0: dagflow.remote_executor.ExecuteRequest
 	(*ExecuteResponse)(nil),   // 1: dagflow.remote_executor.ExecuteResponse
 	(*HealthRequest)(nil),     // 2: dagflow.remote_executor.HealthRequest
@@ -734,7 +734,7 @@ var file_proto_remote_executor_remote_executor_proto_goTypes = []any{
 	(*GetNodeRequest)(nil),    // 11: dagflow.remote_executor.GetNodeRequest
 	(*GetNodeResponse)(nil),   // 12: dagflow.remote_executor.GetNodeResponse
 }
-var file_proto_remote_executor_remote_executor_proto_depIdxs = []int32{
+var file_remote_executor_proto_depIdxs = []int32{
 	8,  // 0: dagflow.remote_executor.ListNodesResponse.items:type_name -> dagflow.remote_executor.NodeDetail
 	8,  // 1: dagflow.remote_executor.GetNodeResponse.node:type_name -> dagflow.remote_executor.NodeDetail
 	0,  // 2: dagflow.remote_executor.RemoteExecutor.Execute:input_type -> dagflow.remote_executor.ExecuteRequest
@@ -756,26 +756,26 @@ var file_proto_remote_executor_remote_executor_proto_depIdxs = []int32{
 	0,  // [0:2] is the sub-list for field type_name
 }
 
-func init() { file_proto_remote_executor_remote_executor_proto_init() }
-func file_proto_remote_executor_remote_executor_proto_init() {
-	if File_proto_remote_executor_remote_executor_proto != nil {
+func init() { file_remote_executor_proto_init() }
+func file_remote_executor_proto_init() {
+	if File_remote_executor_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_remote_executor_remote_executor_proto_rawDesc), len(file_proto_remote_executor_remote_executor_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_remote_executor_proto_rawDesc), len(file_remote_executor_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
-		GoTypes:           file_proto_remote_executor_remote_executor_proto_goTypes,
-		DependencyIndexes: file_proto_remote_executor_remote_executor_proto_depIdxs,
-		MessageInfos:      file_proto_remote_executor_remote_executor_proto_msgTypes,
+		GoTypes:           file_remote_executor_proto_goTypes,
+		DependencyIndexes: file_remote_executor_proto_depIdxs,
+		MessageInfos:      file_remote_executor_proto_msgTypes,
 	}.Build()
-	File_proto_remote_executor_remote_executor_proto = out.File
-	file_proto_remote_executor_remote_executor_proto_goTypes = nil
-	file_proto_remote_executor_remote_executor_proto_depIdxs = nil
+	File_remote_executor_proto = out.File
+	file_remote_executor_proto_goTypes = nil
+	file_remote_executor_proto_depIdxs = nil
 }

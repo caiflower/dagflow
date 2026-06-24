@@ -2,11 +2,11 @@ package node_registry
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	v2 "github.com/caiflower/common-tools/redis/v2"
+	"github.com/caiflower/common-tools/web/common/json"
 
 	pb "github.com/caiflower/dagflow/proto/remote_executor"
 )

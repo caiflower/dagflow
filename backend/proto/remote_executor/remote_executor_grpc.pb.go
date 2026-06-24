@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v7.34.1
-// source: proto/remote_executor/remote_executor.proto
+// source: remote_executor.proto
 
 package remote_executor
 
@@ -155,7 +155,7 @@ var RemoteExecutor_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/remote_executor/remote_executor.proto",
+	Metadata: "remote_executor.proto",
 }
 
 const (
@@ -371,14 +371,5 @@ var NodeRegistry_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/remote_executor/remote_executor.proto",
-}
-
-// Exported handler wrappers for engine.GRPC() registration.
-func NodeRegistry_ListNodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	return _NodeRegistry_ListNodes_Handler(srv, ctx, dec, interceptor)
-}
-
-func NodeRegistry_GetNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	return _NodeRegistry_GetNode_Handler(srv, ctx, dec, interceptor)
+	Metadata: "remote_executor.proto",
 }

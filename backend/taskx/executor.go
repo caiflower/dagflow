@@ -5,8 +5,9 @@ import (
 	"errors"
 
 	"fmt"
-	"github.com/caiflower/common-tools/pkg/tools"
 	"strings"
+
+	"github.com/caiflower/common-tools/pkg/tools"
 
 	"sync"
 
@@ -279,4 +280,10 @@ func executeBranchCondition(taskName, subtaskName, nodeKey, settingsJSON string,
 	}
 
 	return selected, nil
+}
+
+// SetProvider 注册子任务执行器到全局注册表。应用层在 flow 创建/更新时调用。
+// 与 registerProvider 功能相同，提供更清晰的外部 API 名称。
+func SetProvider(taskName, subTaskName string, p executor.ExecutorProvider) {
+	registerProvider(taskName, subTaskName, p)
 }

@@ -420,8 +420,6 @@ func (t *Task) AddSubtask(subtask *Subtask) error {
 	t.subtaskMap[subtask.GetID()] = subtask
 	// Auto-register executor (provider directly bound on Subtask)
 	if subtask.provider != nil {
-		t.em.registerProvider(t.task.TaskName, subtask.GetName(), subtask.provider)
-		registerProvider(t.task.TaskName, subtask.GetName(), subtask.provider)
 		// Extract type info to DAG node for compile-time type checking
 		if tp, ok := subtask.provider.(executor.TypedProvider); ok {
 			node := t.dag.GetNode(subtask.GetID())
@@ -438,10 +436,6 @@ func (t *Task) AddSubtask(subtask *Subtask) error {
 		settings.Protocol = string(subtask.provider.Protocol())
 		settings.ProtocolConfig = extractProviderConfig(subtask.provider)
 		subtask.subtask.Settings = tools.ToJson(settings)
-	}
-	if subtask.rollbackProvider != nil {
-		t.em.registerRollbackProvider(t.task.TaskName, subtask.GetName(), subtask.rollbackProvider)
-		registerRollbackProvider(t.task.TaskName, subtask.GetName(), subtask.rollbackProvider)
 	}
 	// Auto-register pre/post processors (needed when cluster receiver restores from DB)
 	if subtask.preProcessor != nil {
@@ -508,7 +502,7 @@ func (t *Task) AddBranch(node *Subtask, branch *Branch) error {
 		name = fmt.Sprintf("branch_%s", node.GetName())
 	}
 	// Create branch subtask (will be persisted as a regular subtask row)
-	branchSubtask := NewSubtask(name, nil)
+	branchSubtask := NewSubtask(name, branch.ConditionProvider)
 	branchSubtask.subtask.ID = fmt.Sprintf("branch_%s_%d", node.GetID(), len(t.dag.branches[node.GetID()]))
 	branchSubtask.subtask.Settings = tools.ToJson(SubtaskSettings{
 		BranchConfig: &BranchConfig{
@@ -520,11 +514,6 @@ func (t *Task) AddBranch(node *Subtask, branch *Branch) error {
 	// Add to subtask map so it participates in serialization and DAG compilation
 	t.subtaskMap[branchSubtask.GetID()] = branchSubtask
 
-	// Register branch condition provider under branch subtask name
-	// (so executeBranchCondition can resolve it via getProvider at execution time)
-	if branch.ConditionProvider != nil {
-		registerProvider(t.task.TaskName, branchSubtask.GetName(), branch.ConditionProvider)
-	}
 	return t.dag.AddBranch(node.GetID(), branch)
 }
 

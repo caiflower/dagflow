@@ -314,7 +314,7 @@ func (t *taskDispatcher) SubmitTask(ctx context.Context, task *Task) error {
 
 	// If no rollback executor, set rollback to NoneRollback
 	for i, subtask := range subtaskBeans {
-		if task.em.getRollbackProvider(taskBean.TaskName, subtask.TaskName) == nil {
+		if getRollbackProvider(taskBean.TaskName, subtask.TaskName) == nil {
 			subtaskBeans[i].Rollback = string(NoneRollback)
 		}
 	}
@@ -355,7 +355,7 @@ func (t *taskDispatcher) SubmitTaskWithTx(ctx context.Context, task *Task, tx *b
 
 	// If no rollback executor, set rollback to NoneRollback (consistent with SubmitTask)
 	for i, subtask := range subtaskBeans {
-		if task.em.getRollbackProvider(taskBean.TaskName, subtask.TaskName) == nil {
+		if getRollbackProvider(taskBean.TaskName, subtask.TaskName) == nil {
 			subtaskBeans[i].Rollback = string(NoneRollback)
 		}
 	}

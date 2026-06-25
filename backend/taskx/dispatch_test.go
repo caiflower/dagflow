@@ -289,8 +289,24 @@ func commonTaskx(cluster1, cluster2, cluster3 cluster.ICluster) (dispatcher1, di
 // ===== 公共测试辅助方法 =====
 
 // submitAndWait 提交任务并等待完成，返回 DB 中的 Task、子任务列表和按 TaskName 索引的子任务 Map
+// registerTaskProviders registers all subtask providers to the global registry.
+// This is needed because AddSubtask no longer registers providers directly.
+func registerTaskProviders(task *Task) {
+	for _, subtask := range task.subtaskMap {
+		if subtask.provider != nil {
+			registerProvider(task.task.TaskName, subtask.GetName(), subtask.provider)
+		}
+	}
+	for _, subtask := range task.subtaskMap {
+		if subtask.rollbackProvider != nil {
+			registerRollbackProvider(task.task.TaskName, subtask.GetName(), subtask.rollbackProvider)
+		}
+	}
+}
+
 func submitAndWait(t *testing.T, dispatcher *taskDispatcher, task *Task) (*model.Task, []model.Subtask, map[string]*model.Subtask) {
 	t.Helper()
+	registerTaskProviders(task)
 	waitForTask(task, dispatcher)
 
 	deadline := time.Now().Add(30 * time.Second)
@@ -811,6 +827,8 @@ func TestBranchSettingsPersistenceRoundtrip(t *testing.T) {
 	}
 	assert.True(t, found, "should find branch with EndNodes restored")
 
+	// Register branch condition provider before verification (simulating app layer)
+	SetProvider(taskName, branchSubtaskName, branchProvider)
 	// Verify ConditionProvider is resolvable via getProvider at execution time
 	provider := getProvider(taskName, branchSubtaskName)
 	assert.NotNil(t, provider, "ConditionProvider should be resolvable via getProvider")

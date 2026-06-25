@@ -1254,6 +1254,8 @@ func TestTask_BranchWithNameResolution(t *testing.T) {
 	assert.True(t, strings.HasPrefix(next[0].GetName(), "branch_"), "branch subtask should be next after start")
 
 	// Execute the branch condition via executeBranchCondition
+	fullSubtask := task.subtaskMap[next[0].GetID()]
+	SetProvider(task.task.TaskName, next[0].GetName(), fullSubtask.provider)
 	branchSubtask := next[0]
 	selectedKey, err := executeBranchCondition(
 		task.task.TaskName,

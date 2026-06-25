@@ -180,6 +180,8 @@ type Processor func(ctx interface{}, data any) (any, error)
 // SubtaskSettings 子任务的可扩展 JSON 配置，存储在 DB 的 settings 字段中
 type SubtaskSettings struct {
 	BranchConfig *BranchConfig `json:"branch_config,omitempty"`
+	Protocol       string         `json:"protocol,omitempty"`
+	ProtocolConfig map[string]any `json:"protocolConfig,omitempty"`
 }
 
 // BranchConfig 分支配置（持久化到 DB，从全局注册表恢复 ConditionProvider）

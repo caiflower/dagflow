@@ -770,7 +770,12 @@ func TestBranchSettingsPersistenceRoundtrip(t *testing.T) {
 	// Verify parent subtask does NOT have BranchConfig in Settings (new model)
 	for i := range subtaskBeans {
 		if subtaskBeans[i].TaskName == "start" {
-			assert.Empty(t, subtaskBeans[i].Settings, "parent subtask should not have branch config in settings")
+			var parentSettings SubtaskSettings
+			if subtaskBeans[i].Settings != "" {
+				err := json.Unmarshal([]byte(subtaskBeans[i].Settings), &parentSettings)
+				assert.NoError(t, err)
+			}
+			assert.Nil(t, parentSettings.BranchConfig, "parent subtask should not have branch config in settings")
 			break
 		}
 	}

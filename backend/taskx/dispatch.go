@@ -732,7 +732,7 @@ func (t *taskDispatcher) handleBranchResult(ctx context.Context, task *Task, bra
 	for _, endNodeName := range settings.BranchConfig.EndNodes {
 		// Resolve name to ID for comparison (EndNodes stores names, selectedKey is ID)
 		endNodeID := task.resolveSubtaskKey(endNodeName)
-		if endNodeID == selectedKey {
+		if endNodeID == selectedKey || endNodeName == selectedKey {
 			continue // This is the selected path, keep it active
 		}
 		// Find the subtask by name and skip it

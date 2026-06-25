@@ -10,15 +10,15 @@ import (
 // ProtocolGrpcService Protocol gRPC 服务实现
 type ProtocolGrpcService struct {
 	pb.UnimplementedProtocolServiceServer
-	registry *protocol.Registry
+	Registry *protocol.Registry `autowired:""`
 }
 
-func NewProtocolGrpcService(registry *protocol.Registry) *ProtocolGrpcService {
-	return &ProtocolGrpcService{registry: registry}
+func NewProtocolGrpcService() *ProtocolGrpcService {
+	return &ProtocolGrpcService{}
 }
 
 func (s *ProtocolGrpcService) List(_ context.Context, _ *pb.ListProtocolRequest) (*pb.ListProtocolResponse, error) {
-	infos := s.registry.List()
+	infos := s.Registry.List()
 	items := make([]*pb.ProtocolInfo, len(infos))
 	for i, info := range infos {
 		items[i] = protocolInfoToProto(info)
@@ -27,7 +27,7 @@ func (s *ProtocolGrpcService) List(_ context.Context, _ *pb.ListProtocolRequest)
 }
 
 func (s *ProtocolGrpcService) Get(_ context.Context, req *pb.GetProtocolRequest) (*pb.ProtocolResponse, error) {
-	factory, err := s.registry.Get(req.Name)
+	factory, err := s.Registry.Get(req.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -54,9 +54,9 @@ func protocolInfoToProto(info protocol.ProtocolInfo) *pb.ProtocolInfo {
 		}
 	}
 	return &pb.ProtocolInfo{
-		Name:        info.Name,
-		DisplayName: info.DisplayName,
-		Description: info.Description,
+		Name:         info.Name,
+		DisplayName:  info.DisplayName,
+		Description:  info.Description,
 		ConfigSchema: &pb.ConfigSchema{Fields: fields},
 	}
 }

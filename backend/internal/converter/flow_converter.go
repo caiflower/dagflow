@@ -77,7 +77,7 @@ func FlowToTask(flow *model.Flow, providerFactory func(protocol string, config m
 	if err != nil {
 		return nil, err
 	}
-	return FlowToTaskWithNodes(flow.Name, nodes, edges, providerFactory, nodeInputs)
+	return FlowToTaskWithNodes(flow.ID, nodes, edges, providerFactory, nodeInputs)
 }
 
 // FlowToTaskWithNodes creates a taskx.Task directly from nodes and edges (for testing)

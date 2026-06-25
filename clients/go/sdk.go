@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -118,21 +119,27 @@ func (s *SDK) heartbeatLoop(ctx context.Context) {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
-	conn, err := grpc.NewClient(s.config.EngineAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return
-	}
-	defer conn.Close()
-	client := pb.NewNodeRegistryClient(conn)
-
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			client.Heartbeat(ctx, &pb.HeartbeatRequest{NodeId: s.config.NodeID})
+			conn, err := grpc.NewClient(s.config.EngineAddr,
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
+			)
+			if err != nil {
+				continue
+			}
+			client := pb.NewNodeRegistryClient(conn)
+			_, err = client.Heartbeat(ctx, &pb.HeartbeatRequest{NodeId: s.config.NodeID})
+			conn.Close()
+			if err != nil {
+				if strings.Contains(err.Error(), "not found") {
+					// Node TTL expired, re-register
+					_ = s.registerWithEngine(ctx, s.functionList())
+				}
+				continue
+			}
 		}
 	}
 }
@@ -167,10 +174,10 @@ func (s *ExecutorServer) HealthCheck(ctx context.Context, req *pb.HealthRequest)
 
 // Client provides gRPC access to DAGFlow engine services.
 type Client struct {
-	conn       *grpc.ClientConn
-	Flow       dagflowpb.FlowServiceClient
-	Protocol   dagflowpb.ProtocolServiceClient
-	Execution  dagflowpb.ExecutionServiceClient
+	conn      *grpc.ClientConn
+	Flow      dagflowpb.FlowServiceClient
+	Protocol  dagflowpb.ProtocolServiceClient
+	Execution dagflowpb.ExecutionServiceClient
 }
 
 // NewClient creates a new DAGFlow gRPC client connected to the engine address.

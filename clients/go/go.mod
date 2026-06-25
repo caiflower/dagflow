@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	github.com/caiflower/dagflow v0.0.0
 	github.com/stretchr/testify v1.11.1
-	google.golang.org/grpc v1.77.0
+	google.golang.org/grpc v1.79.3
 )
 
 require (

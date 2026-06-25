@@ -18,13 +18,9 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"net"
 	"runtime"
-	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/caiflower/common-tools/cluster"
 	dbv1 "github.com/caiflower/common-tools/db/v1"
 	"github.com/caiflower/common-tools/global"
 	"github.com/caiflower/common-tools/pkg/bean"
@@ -32,6 +28,7 @@ import (
 	v2 "github.com/caiflower/common-tools/redis/v2"
 	"github.com/caiflower/common-tools/web"
 	"github.com/caiflower/common-tools/web/app/server/config"
+	"github.com/caiflower/dagflow/internal/daemon"
 	"github.com/caiflower/dagflow/internal/dao"
 	"github.com/caiflower/dagflow/internal/dao/model"
 	"github.com/caiflower/dagflow/internal/node_registry"
@@ -39,13 +36,9 @@ import (
 
 	"github.com/caiflower/dagflow/constants"
 	"github.com/caiflower/dagflow/internal/api"
-	dagflowpb "github.com/caiflower/dagflow/internal/proto"
 	"github.com/caiflower/dagflow/internal/protocol"
 	"github.com/caiflower/dagflow/internal/service"
-	pb "github.com/caiflower/dagflow/proto/remote_executor"
-	"github.com/caiflower/dagflow/taskx"
 	taskxModel "github.com/caiflower/dagflow/taskx/dao/model"
-	"google.golang.org/grpc"
 )
 
 var engine *web.Engine
@@ -55,10 +48,6 @@ var dbClient *dbv1.Client
 
 // protocolRegistry 全局协议注册中心
 var protocolRegistry *protocol.Registry
-
-// dagflowCluster 单节点集群引用
-var dagflowCluster cluster.ICluster
-
 var nodeReg *node_registry.NodeRegistry
 var remotePool *remote_executor.ConnPool
 
@@ -80,19 +69,15 @@ func init() {
 	// 5. 初始化数据库
 	initDB()
 
-	// 6. 初始化 taskx 集群调度（注册 cluster + DAO beans）
-	initTaskx()
-
-	// 7. 注入所有 autowired 依赖
-	bean.Ioc()
-
-	// 8. Ioc 完成后，启动 taskx receiver 和 cluster
-	startTaskx()
-
-	// 9. 创建 gRPC 服务实例并设置到 API 层
+	// 7. 创建 gRPC 服务实例并设置到 API 层
 	initGrpcServices()
 
-	// 10. 初始化 Web 引擎（路由注册在 gRPC 服务就绪后执行）
+	daemon.RegisterTaskxDaemons(dbClient)
+
+	// 8. 注入所有 autowired 依赖
+	bean.Ioc()
+
+	// 9. 初始化 Web 引擎（路由注册在 gRPC 服务就绪后执行）
 	initWeb()
 }
 
@@ -117,15 +102,22 @@ func initBean() {
 	remotePool = remote_executor.NewConnPool()
 	global.DefaultResourceManger.Add(remotePool)
 	service.SetRemoteExecutorPool(remotePool)
+
+	// Initialize Grpc Server
+	server := daemon.NewGrpcServer()
+	bean.AddBean(server)
+	global.DefaultResourceManger.AddDaemon(server)
 }
 
 // initGrpcServices 创建 gRPC 服务实例并设置到 API 层
 func initGrpcServices() {
 	flowSvc := bean.GetBeanT[*service.FlowService]()
 	execSvc := bean.GetBeanT[*service.ExecutionService]()
+	grpcService := api.NewProtocolGrpcService()
+	bean.AddBean(grpcService)
 
 	api.SetFlowGrpcService(api.NewFlowGrpcService(flowSvc))
-	api.SetProtocolGrpcService(api.NewProtocolGrpcService(protocolRegistry))
+	api.SetProtocolGrpcService(grpcService)
 	api.SetExecutionGrpcService(api.NewExecutionGrpcService(execSvc))
 
 	// Initialize NodeRegistry with Redis client from config
@@ -163,73 +155,7 @@ func initGrpcServices() {
 	nodeReg = node_registry.NewNodeRegistry(redisClient)
 	service.SetNodeRegistry(nodeReg)
 	api.SetNodeRegistryService(nodeReg)
-
-	// Start unified gRPC server as daemon (managed by global.ResourceManger)
-	startGrpcServer()
-}
-
-// GrpcServer wraps a gRPC server hosting all DAGFlow services as a daemon resource.
-type GrpcServer struct {
-	server *grpc.Server
-	lis    net.Listener
-}
-
-func (g *GrpcServer) Name() string { return "GrpcServer" }
-
-func (g *GrpcServer) Start() error {
-	logger.Info("gRPC server listening on %s", g.lis.Addr().String())
-
-	go func() {
-		if err := g.server.Serve(g.lis); err != nil {
-			logger.Error("failed to start gRPC server: %v", err)
-		}
-	}()
-
-	return nil
-}
-
-func (g *GrpcServer) Close() {
-	logger.Info("gRPC server shutting down...")
-	g.server.GracefulStop()
-	logger.Info("gRPC server stopped")
-}
-
-func startGrpcServer() {
-	port := constants.Prop.GRPC.Port
-	if port == 0 {
-		port = 50051
-	}
-
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-	if err != nil {
-		logger.Error("failed to listen on gRPC port %d: %v", port, err)
-		return
-	}
-
-	s := grpc.NewServer()
-
-	// Register NodeRegistry service
-	if nodeReg != nil {
-		pb.RegisterNodeRegistryServer(s, nodeReg)
-		logger.Info("gRPC: NodeRegistry service registered")
-	}
-
-	// Register Flow/Protocol/Execution services
-	if flowSvc := api.GetFlowGrpcService(); flowSvc != nil {
-		dagflowpb.RegisterFlowServiceServer(s, flowSvc)
-		logger.Info("gRPC: Flow service registered")
-	}
-	if protoSvc := api.GetProtocolGrpcService(); protoSvc != nil {
-		dagflowpb.RegisterProtocolServiceServer(s, protoSvc)
-		logger.Info("gRPC: Protocol service registered")
-	}
-	if execSvc := api.GetExecutionGrpcService(); execSvc != nil {
-		dagflowpb.RegisterExecutionServiceServer(s, execSvc)
-		logger.Info("gRPC: Execution service registered")
-	}
-
-	grpcServer := &GrpcServer{server: s, lis: lis}
-	global.DefaultResourceManger.AddDaemon(grpcServer)
+	bean.AddBean(nodeReg)
 }
 
 // initWeb 创建 Web 引擎并注册路由
@@ -298,57 +224,4 @@ func initDB() {
 	dao.InitExecutionRecord()
 
 	logger.Info("database initialized successfully")
-}
-
-// initTaskx 初始化 taskx 集群调度基础设施
-// 在 bean.Ioc() 之前调用，注册 cluster 和 taskx DAO beans
-func initTaskx() {
-	// 从 default.yaml 读取集群配置
-	clusterCfg := constants.DefaultConfig.ClusterConfig
-
-	c, err := cluster.NewClusterWithArgs(clusterCfg, logger.NewLogger(&logger.Config{}))
-	if err != nil {
-		panic("failed to create cluster: " + err.Error())
-	}
-	// 注册 cluster 为 bean，供 taskx dispatcher/receiver autowired 注入
-	dagflowCluster = c
-	bean.AddBean(c)
-
-	// 初始化 taskx dispatcher（使用已有 DB client）
-	taskx.InitTaskDispatcherWithDB(&taskx.Config{
-		SubtaskWorker:            50,
-		SubtaskQueueSize:         200,
-		SubtaskRollbackWorker:    10,
-		SubtaskRollbackQueueSize: 100,
-		TaskWorker:               5,
-		TaskQueueSize:            100,
-		RemoteCallTimeout:        3 * time.Second,
-	}, dbClient)
-}
-
-// startTaskx 启动 taskx receiver 和 cluster（在 bean.Ioc() 之后调用）
-func startTaskx() {
-	if err := taskx.StartReceiver(); err != nil {
-		panic("failed to start taskx receiver: " + err.Error())
-	}
-
-	tracker := cluster.NewDefaultJobTracker(5, taskx.SingletonTaskDispatcher)
-	if err := dagflowCluster.AddJobTracker(tracker); err != nil {
-		panic("failed to add job tracker: " + err.Error())
-	}
-	if err := dagflowCluster.Start(); err != nil {
-		panic("failed to start cluster: " + err.Error())
-	}
-
-	// 等待集群就绪
-	go func() {
-		for i := 0; i < 30; i++ {
-			if dagflowCluster.IsReady() {
-				logger.Info("taskx cluster ready")
-				return
-			}
-			time.Sleep(time.Second)
-		}
-		logger.Warn("taskx cluster not ready after 30s")
-	}()
 }

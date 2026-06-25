@@ -29,7 +29,7 @@ import (
 func RegisterRoutes(engine *web.Engine) {
 	engine.Use(corsMiddleware)
 	engine.Use(requestLogMiddleware)
-	engine.Use(recoveryMiddleware)
+	//engine.Use(recoveryMiddleware)
 
 	v1 := engine.Group("/api/v1")
 

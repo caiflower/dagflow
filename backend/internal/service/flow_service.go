@@ -15,6 +15,7 @@ import (
 	"github.com/caiflower/common-tools/pkg/tools"
 
 	"github.com/caiflower/dagflow/internal/converter"
+	"github.com/caiflower/dagflow/taskx"
 )
 
 // FlowService Flow 业务逻辑层
@@ -67,6 +68,8 @@ func (s *FlowService) Create(ctx context.Context, req *CreateFlowReq) (*model.Fl
 	if _, err := s.FlowDAO.Insert(ctx, flow); err != nil {
 		return nil, fmt.Errorf("insert flow: %w", err)
 	}
+	// Register providers for all nodes so other instances can resolve them
+	RegisterFlowProviders(flow)
 	return flow, nil
 }
 
@@ -114,6 +117,9 @@ func (s *FlowService) Update(ctx context.Context, req *UpdateFlowReq) (*model.Fl
 	existing.Version++
 	existing.UpdateTime = basic.NewFromTime(time.Now())
 
+	// Clear old providers and re-register
+	taskx.ClearProviders(existing.Name)
+	RegisterFlowProviders(existing)
 	if err := s.FlowDAO.Update(ctx, existing); err != nil {
 		return nil, fmt.Errorf("update flow: %w", err)
 	}
@@ -122,6 +128,11 @@ func (s *FlowService) Update(ctx context.Context, req *UpdateFlowReq) (*model.Fl
 
 // Delete 删除 Flow（软删除）
 func (s *FlowService) Delete(ctx context.Context, id string) error {
+	flow, err := s.FlowDAO.GetByID(ctx, id)
+	if err != nil {
+		return e.NewApiError(e.NotFound, fmt.Sprintf("flow %s not found", id), err)
+	}
+	taskx.ClearProviders(flow.Name)
 	return s.FlowDAO.Delete(ctx, id)
 }
 

@@ -11,19 +11,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/caiflower/common-tools/pkg/logger"
+	"github.com/caiflower/dagflow/internal/converter"
+	"github.com/caiflower/dagflow/internal/dao/model"
 	"github.com/caiflower/dagflow/internal/node_registry"
-	remote_executor2 "github.com/caiflower/dagflow/internal/protocol/remote_executor"
+	"github.com/caiflower/dagflow/internal/protocol/remote_executor"
+	"github.com/caiflower/dagflow/taskx"
 	"github.com/caiflower/dagflow/taskx/executor"
 )
 
 var nodeRegistry *node_registry.NodeRegistry
-var remoteExecutorPool *remote_executor2.ConnPool
+var remoteExecutorPool *remote_executor.ConnPool
 
 func SetNodeRegistry(r *node_registry.NodeRegistry) {
 	nodeRegistry = r
 }
 
-func SetRemoteExecutorPool(p *remote_executor2.ConnPool) {
+func SetRemoteExecutorPool(p *remote_executor.ConnPool) {
 	remoteExecutorPool = p
 }
 
@@ -42,7 +46,7 @@ func createProvider(protocol string, config map[string]any) (executor.ExecutorPr
 		if t, ok := config["timeout"].(float64); ok && t > 0 {
 			timeout = time.Duration(t) * time.Second
 		}
-		return &remote_executor2.RemoteFuncProvider{
+		return &remote_executor.RemoteFuncProvider{
 			FuncName: funcName,
 			Timeout:  timeout,
 			Registry: nodeRegistry,
@@ -194,4 +198,25 @@ func (p *stubProvider) Execute(ctx context.Context, data *executor.TaskData) (an
 
 func (p *stubProvider) Protocol() executor.Protocol {
 	return executor.Protocol(p.protocol)
+}
+
+// RegisterFlowProviders creates and registers providers for all nodes in a flow definition.
+// Called on flow create/update and on startup to ensure all instances can find providers.
+func RegisterFlowProviders(flow *model.Flow) {
+	nodes, _, err := converter.ParseFlowJSON(flow)
+	if err != nil {
+		logger.Error("RegisterFlowProviders: parse flow %s failed: %v", flow.Name, err)
+		return
+	}
+	for _, n := range nodes {
+		if n.Type == "start" || n.Type == "end" {
+			continue
+		}
+		provider, err := createProvider(n.Protocol, n.Config)
+		if err != nil {
+			logger.Error("RegisterFlowProviders: create provider for node %s failed: %v", n.Name, err)
+			continue
+		}
+		taskx.SetProvider(flow.ID, n.ID, provider)
+	}
 }

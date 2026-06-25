@@ -393,6 +393,21 @@ func (t *Task) SetCustomRollbackFunc(fn func(completed []string, failed string) 
 // It is also registered to the global registry to ensure the cluster receiver can find the provider.
 // Note: providers with the same taskName+subTaskName will be overwritten by later registrations (global registry override semantics);
 // different Task instances with the same taskName should register identical providers.
+
+func extractProviderConfig(p executor.ExecutorProvider) map[string]any {
+	if p == nil {
+		return nil
+	}
+	config := make(map[string]any)
+	// If provider exposes its own config, use it
+	if cp, ok := p.(executor.ConfigurableProvider); ok {
+		for k, v := range cp.ProviderConfig() {
+			config[k] = v
+		}
+	}
+	return config
+}
+
 func (t *Task) AddSubtask(subtask *Subtask) error {
 	err := t.dag.AddNode(subtask.GetID(), subtask.triggerMode)
 	if err != nil {
@@ -415,6 +430,14 @@ func (t *Task) AddSubtask(subtask *Subtask) error {
 				node.outputType = tp.OutputType()
 			}
 		}
+		// Persist protocol metadata so other instances can reconstruct the provider
+		settings := SubtaskSettings{}
+		if subtask.subtask.Settings != "" {
+			_ = tools.Unmarshal([]byte(subtask.subtask.Settings), &settings)
+		}
+		settings.Protocol = string(subtask.provider.Protocol())
+		settings.ProtocolConfig = extractProviderConfig(subtask.provider)
+		subtask.subtask.Settings = tools.ToJson(settings)
 	}
 	if subtask.rollbackProvider != nil {
 		t.em.registerRollbackProvider(t.task.TaskName, subtask.GetName(), subtask.rollbackProvider)

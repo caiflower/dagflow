@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/caiflower/common-tools/pkg/logger"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -61,6 +62,7 @@ func (p *ConnPool) Release(address string) {
 func (p *ConnPool) Close() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	logger.Info("remote_executor closing all connections")
 	for addr, entry := range p.conns {
 		entry.conn.Close()
 		delete(p.conns, addr)

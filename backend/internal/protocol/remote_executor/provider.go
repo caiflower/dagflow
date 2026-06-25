@@ -65,3 +65,10 @@ func (p *RemoteFuncProvider) Execute(ctx context.Context, data *executor.TaskDat
 func (p *RemoteFuncProvider) Protocol() executor.Protocol {
 	return ProtocolRemoteFunc
 }
+
+func (p *RemoteFuncProvider) ProviderConfig() map[string]any {
+	return map[string]any{
+		"funcName": p.FuncName,
+		"timeout":  int(p.Timeout.Seconds()),
+	}
+}

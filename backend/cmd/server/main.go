@@ -115,6 +115,7 @@ func initBean() {
 
 	// Initialize RemoteExecutor connection pool
 	remotePool = remote_executor.NewConnPool()
+	global.DefaultResourceManger.Add(remotePool)
 	service.SetRemoteExecutorPool(remotePool)
 }
 

@@ -49,3 +49,10 @@ type TypedProvider interface {
 	InputType() reflect.Type
 	OutputType() reflect.Type
 }
+
+// ConfigurableProvider 可选接口，提供 Provider 配置信息用于持久化
+// ExecutorProvider 实现此接口后，AddSubtask 会自动提取配置并持久化到 SubtaskSettings.ProtocolConfig
+type ConfigurableProvider interface {
+	ExecutorProvider
+	ProviderConfig() map[string]any
+}

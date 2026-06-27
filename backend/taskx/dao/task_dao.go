@@ -16,6 +16,7 @@ type TaskDAO interface {
 	GetByID(ctx context.Context, id string) (*model.Task, error)
 	GetByIDs(ctx context.Context, taskIDs []string) ([]model.Task, error)
 	GetTodoTask(ctx context.Context, taskState []string, time basic.Time) ([]model.Task, error)
+	GetOldTasks(ctx context.Context, taskState []string, beforeCreateTime basic.Time) ([]model.Task, error)
 	CASWorkerAndState(ctx context.Context, taskID string, worker, state string, oldWorker string) (int64, error)
 	SetState(ctx context.Context, id string, state string) (int64, error)
 }

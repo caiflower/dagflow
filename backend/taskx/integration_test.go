@@ -13,6 +13,7 @@ import (
 
 	"github.com/caiflower/common-tools/web/common/json"
 	"github.com/caiflower/dagflow/taskx/executor"
+	"github.com/caiflower/dagflow/taskx/types"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -992,7 +993,7 @@ func TestIT_Branch_SelectPathB(t *testing.T) {
 	assert.Equal(t, "end", next[0].GetName())
 
 	// 验证 pathA 的 subtask 状态为 Skipped
-	assert.Equal(t, string(TaskSkipped), pathA.GetState())
+	assert.Equal(t, string(types.TaskSkipped), pathA.GetState())
 }
 
 // TestIT_Branch_WithDataFlow 分支节点输出通过数据流传递给选中路径
@@ -1124,8 +1125,8 @@ func TestIT_Branch_SkipAutoPropagation(t *testing.T) {
 	assert.Equal(t, "end", next[0].GetName())
 
 	// 验证 pathA 和 pathC 的 subtask 状态为 Skipped
-	assert.Equal(t, string(TaskSkipped), pathA.GetState())
-	assert.Equal(t, string(TaskSkipped), pathC.GetState())
+	assert.Equal(t, string(types.TaskSkipped), pathA.GetState())
+	assert.Equal(t, string(types.TaskSkipped), pathC.GetState())
 }
 
 // TestIT_Branch_AnyPredecessorConverge AnyPredecessor 触发模式 + 分支收敛

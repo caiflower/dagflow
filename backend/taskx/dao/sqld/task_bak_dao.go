@@ -9,7 +9,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-const DefaultTableNameOfTaskBak = "task_bak"
+const DefaultTableNameOfTaskBak = "task_archive"
 
 type taskBakDAO struct {
 	client    *dbv1.Client
@@ -47,10 +47,27 @@ func (d *taskBakDAO) Insert(ctx context.Context, data *model.TaskBak) (int64, er
 	return d.client.GetRowsAffected(d.db(ctx).NewInsert().Model(data).ModelTableExpr(d.tableName).Exec(ctx))
 }
 
-func (d *taskBakDAO) QueryPage(ctx context.Context, filter *model.TaskBakFilter) (res []model.TaskBak, cnt int, err error) {
-	res = make([]model.TaskBak, 0)
-	cnt, err = d.client.QueryPage(ctx, &res, filter)
-	return
+func (d *taskBakDAO) BatchInsert(ctx context.Context, data []model.TaskBak) (int64, error) {
+	if len(data) == 0 {
+		return 0, nil
+	}
+	pageNumber := 1
+	batch := 50
+	count := int64(0)
+	for {
+		canSplit, start, end := dbv1.SplitIndex(pageNumber, batch, len(data))
+		if !canSplit {
+			break
+		}
+		batchList := data[start:end]
+		cnt, err := d.client.GetRowsAffected(d.db(ctx).NewInsert().Model(&batchList).ModelTableExpr(d.tableName).Exec(ctx))
+		if err != nil {
+			return count, err
+		}
+		count += cnt
+		pageNumber++
+	}
+	return count, nil
 }
 
 func (d *taskBakDAO) GetByID(ctx context.Context, id string) (*model.TaskBak, error) {
@@ -63,6 +80,18 @@ func (d *taskBakDAO) GetByID(ctx context.Context, id string) (*model.TaskBak, er
 		return nil, err
 	}
 	return m, err
+}
+
+func (d *taskBakDAO) GetByIDs(ctx context.Context, ids []string) ([]model.TaskBak, error) {
+	var tasks []model.TaskBak
+	if len(ids) == 0 {
+		return tasks, nil
+	}
+	err := d.client.GetDB().NewSelect().Model(&tasks).ModelTableExpr(d.tableName).ColumnExpr("*").Where("status>0").Where("id IN (?)", bun.In(ids)).Scan(ctx, &tasks)
+	if err != nil {
+		return nil, err
+	}
+	return tasks, nil
 }
 
 func (d *taskBakDAO) DeleteByID(ctx context.Context, id string) (int64, error) {

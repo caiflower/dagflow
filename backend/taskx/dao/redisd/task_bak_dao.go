@@ -15,18 +15,26 @@ type taskBakDAO struct {
 	keys   *keyBuilder
 }
 
-// NewTaskBakDAOWithClient creates a Redis-backed TaskBakDAO.
 func NewTaskBakDAOWithClient(client v2.RedisClient) dao.TaskBakDAO {
 	return NewTaskBakDAOWithConfig(client, nil)
 }
 
-// NewTaskBakDAOWithConfig creates a Redis-backed TaskBakDAO with custom key config.
 func NewTaskBakDAOWithConfig(client v2.RedisClient, keyCfg *KeyConfig) dao.TaskBakDAO {
 	return &taskBakDAO{
 		client: client,
 		store:  NewStore(client),
 		keys:   newKeyBuilder(keyCfg),
 	}
+}
+
+func (d *taskBakDAO) GetStore() dao.Store { return d.store }
+
+func (d *taskBakDAO) Insert(_ context.Context, _ *model.TaskBak) (int64, error) {
+	return 0, nil
+}
+
+func (d *taskBakDAO) BatchInsert(_ context.Context, _ []model.TaskBak) (int64, error) {
+	return 0, nil
 }
 
 func (d *taskBakDAO) GetByID(ctx context.Context, id string) (*model.TaskBak, error) {
@@ -48,4 +56,8 @@ func (d *taskBakDAO) GetByID(ctx context.Context, id string) (*model.TaskBak, er
 		return nil, nil
 	}
 	return bak, nil
+}
+
+func (d *taskBakDAO) GetByIDs(_ context.Context, _ []string) ([]model.TaskBak, error) {
+	return nil, nil
 }

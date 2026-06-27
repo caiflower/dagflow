@@ -28,12 +28,15 @@ import (
 
 	"github.com/caiflower/common-tools/pkg/basic"
 	"github.com/caiflower/common-tools/pkg/inflight"
+	"github.com/caiflower/dagflow/taskx/backup"
 	"github.com/caiflower/dagflow/taskx/dao"
 	"github.com/caiflower/dagflow/taskx/dao/model"
 	"github.com/caiflower/dagflow/taskx/dao/redisd"
 	"github.com/caiflower/dagflow/taskx/dao/sqld"
 	"github.com/caiflower/dagflow/taskx/executor"
 	"github.com/caiflower/dagflow/taskx/proto"
+	"github.com/caiflower/dagflow/taskx/query"
+	"github.com/caiflower/dagflow/taskx/types"
 
 	"github.com/caiflower/common-tools/cluster"
 	dbv1 "github.com/caiflower/common-tools/db/v1"
@@ -52,14 +55,15 @@ var initOnce sync.Once
 
 type taskDispatcher struct {
 	cluster.DefaultCaller
-	Cluster       cluster.ICluster  `autowired:""`
-	TaskDao       dao.TaskDAO       `autowired:""`
-	TaskBakDao    dao.TaskBakDAO    `autowired:""`
-	SubtaskDao    dao.SubtaskDAO    `autowired:""`
-	SubtaskBakDao dao.SubtaskBakDAO `autowired:""`
-	TaskEdgeDao   dao.TaskEdgeDAO   `autowired:""`
-	DBClient      dbv1.DB           `autowired:""`
-	TaskReceiver  *taskReceiver     `autowired:""`
+	Cluster       cluster.ICluster    `autowired:""`
+	TaskDao       dao.TaskDAO         `autowired:""`
+	TaskBakDao    dao.TaskBakDAO      `autowired:""`
+	SubtaskDao    dao.SubtaskDAO      `autowired:""`
+	SubtaskBakDao dao.SubtaskBakDAO   `autowired:""`
+	TaskEdgeDao   dao.TaskEdgeDAO     `autowired:""`
+	DBClient      dbv1.DB             `autowired:""`
+	BackupManager types.BackupManager `autowired:""`
+	TaskReceiver  *taskReceiver       `autowired:""`
 
 	cfg                    *Config
 	running                atomic.Value
@@ -82,7 +86,7 @@ type Config struct {
 	SubtaskRollbackWorker    int           `yaml:"subtaskRollbackWorker" default:"50"`
 	SubtaskRollbackQueueSize int           `yaml:"subtaskRollbackQueueSize" default:"100"`
 	RemoteCallTimeout        time.Duration `yaml:"remoteCallTimeout" default:"3s"`
-	BackupTaskAge            time.Duration `yaml:"backupTaskAge" default:"168h"`
+	BackUpConfig             types.BackupConfig
 	// StorageBackend selects the persistence backend: "sql" (default) or "redis".
 	StorageBackend string `yaml:"storageBackend" default:"sql"`
 	// RedisClient is required when StorageBackend is "redis".
@@ -97,7 +101,7 @@ type Config struct {
 }
 
 type affinity struct {
-	Type   TaskAffinityType
+	Type   types.TaskAffinityType
 	Worker string
 }
 
@@ -148,6 +152,12 @@ func InitTaskDispatcher(cfg *Config) {
 			bean.AddBean(redisd.NewSubtaskDAOWithConfig(cfg.RedisClient, keyCfg))
 			bean.AddBean(redisd.NewSubtaskBakDAOWithConfig(cfg.RedisClient, keyCfg))
 			bean.AddBean(redisd.NewTaskEdgeDAOWithConfig(cfg.RedisClient, keyCfg))
+			if cfg.BackUpConfig.Age == 0 {
+				cfg.BackUpConfig.Age = 24 * time.Hour
+			}
+			bean.AddBean(redisd.NewTaskEdgeArchiveDAOWithConfig(cfg.RedisClient, keyCfg))
+			bean.AddBean(&backup.RedisBackupManager{})
+			bean.AddBean(&query.RedisTaskQueryService{})
 		} else {
 			tables := cfg.Tables
 			if tables == nil {
@@ -161,6 +171,9 @@ func InitTaskDispatcher(cfg *Config) {
 			bean.AddBean(sqld.NewSubtaskDAOWithConfig(nil, tables.Subtask))
 			bean.AddBean(sqld.NewSubtaskBakDAOWithConfig(nil, tables.SubtaskBak))
 			bean.AddBean(sqld.NewTaskEdgeDAOWithConfig(nil, tables.TaskEdge))
+			bean.AddBean(sqld.NewTaskEdgeArchiveDAOWithConfig(nil, tables.TaskEdgeArchive))
+			bean.AddBean(&backup.SQLBackupManager{})
+			bean.AddBean(&query.SQLTaskQueryService{})
 		}
 
 		bean.AddBean(SingletonTaskDispatcher)
@@ -202,6 +215,9 @@ func InitTaskDispatcherWithDB(cfg *Config, client *dbv1.Client) {
 		bean.AddBean(sqld.NewSubtaskDAOWithConfig(client, tables.Subtask))
 		bean.AddBean(sqld.NewSubtaskBakDAOWithConfig(client, tables.SubtaskBak))
 		bean.AddBean(sqld.NewTaskEdgeDAOWithConfig(client, tables.TaskEdge))
+		bean.AddBean(sqld.NewTaskEdgeArchiveDAOWithConfig(client, tables.TaskEdgeArchive))
+		bean.AddBean(&backup.SQLBackupManager{})
+		bean.AddBean(&query.SQLTaskQueryService{})
 
 		bean.AddBean(SingletonTaskDispatcher)
 		bean.AddBean(_tr)
@@ -251,7 +267,7 @@ func (t *taskDispatcher) MasterCall() {
 	// handle task
 	t.handleTask(context.TODO())
 	// back task
-	//t.backupTask()
+	t.backupTask()
 }
 
 // OnStartedLeading handles task distribution when becoming leader
@@ -304,8 +320,8 @@ func SubmitTask(ctx context.Context, task *Task) error {
 func (t *taskDispatcher) SubmitTask(ctx context.Context, task *Task) error {
 	taskBean, subtaskBeans, edgeBeans := task.convert2Bean()
 
-	if TaskAffinityType(taskBean.AffinityType) != AffinityRandom && taskBean.PrimaryWorker == "" {
-		nodeName := t.selectNodeByAffinity(AffinityRandom, "", "")
+	if types.TaskAffinityType(taskBean.AffinityType) != types.AffinityRandom && taskBean.PrimaryWorker == "" {
+		nodeName := t.selectNodeByAffinity(types.AffinityRandom, "", "")
 		if nodeName == "" {
 			return errors.New("task node name failed")
 		}
@@ -315,7 +331,7 @@ func (t *taskDispatcher) SubmitTask(ctx context.Context, task *Task) error {
 	// If no rollback executor, set rollback to NoneRollback
 	for i, subtask := range subtaskBeans {
 		if getRollbackProvider(taskBean.TaskName, subtask.TaskName) == nil {
-			subtaskBeans[i].Rollback = string(NoneRollback)
+			subtaskBeans[i].Rollback = string(types.NoneRollback)
 		}
 	}
 
@@ -356,7 +372,7 @@ func (t *taskDispatcher) SubmitTaskWithTx(ctx context.Context, task *Task, tx *b
 	// If no rollback executor, set rollback to NoneRollback (consistent with SubmitTask)
 	for i, subtask := range subtaskBeans {
 		if getRollbackProvider(taskBean.TaskName, subtask.TaskName) == nil {
-			subtaskBeans[i].Rollback = string(NoneRollback)
+			subtaskBeans[i].Rollback = string(types.NoneRollback)
 		}
 	}
 
@@ -460,7 +476,7 @@ func (t *taskDispatcher) handleTask(ctx context.Context) {
 	endTime := basic.NewFromTime(now.Add(2 * time.Minute))
 
 	// Get tasks by filter
-	tasks, err := t.TaskDao.GetTodoTask(ctx, []string{string(TaskPending), string(TaskRunning), string(TaskSubtaskRunning)}, endTime)
+	tasks, err := t.TaskDao.GetTodoTask(ctx, []string{string(types.TaskPending), string(types.TaskRunning)}, endTime)
 	if err != nil {
 		logger.Error("[MasterCall] get tasks failed. err: %v", err)
 		return
@@ -518,7 +534,7 @@ func (t *taskDispatcher) analysisTask(ctx context.Context, task *Task, subtaskMa
 		hasFailed := false
 		rollbackNeeded := false
 		for _, subtask := range subtaskMap {
-			if subtask.GetState() == string(TaskFailed) {
+			if subtask.GetState() == string(types.TaskFailed) {
 				hasFailed = true
 				if subtask.hasRollbackExecutor() && !subtask.isRollbackFinished() {
 					rollbackNeeded = true
@@ -531,11 +547,11 @@ func (t *taskDispatcher) analysisTask(ctx context.Context, task *Task, subtaskMa
 			// No pending rollbacks, sync DB state and finish
 			finished = true
 			if hasFailed {
-				_, _ = t.TaskDao.SetState(ctx, task.GetID(), string(TaskFailed))
-				task.task.State = string(TaskFailed)
+				_, _ = t.TaskDao.SetState(ctx, task.GetID(), string(types.TaskFailed))
+				task.task.State = string(types.TaskFailed)
 			} else {
-				_, _ = t.TaskDao.SetState(ctx, task.GetID(), string(TaskSucceeded))
-				task.task.State = string(TaskSucceeded)
+				_, _ = t.TaskDao.SetState(ctx, task.GetID(), string(types.TaskSucceeded))
+				task.task.State = string(types.TaskSucceeded)
 			}
 			logger.Trace("[analysisTask] task=%s synced DB state to %s", task.GetID(), task.getState())
 			// Task finished (rollback finished), remove from cache to prevent memory leaks
@@ -554,7 +570,7 @@ func (t *taskDispatcher) analysisTask(ctx context.Context, task *Task, subtaskMa
 
 	// New path: process completed branch subtask results
 	for _, subtask := range subtaskMap {
-		if subtask.GetState() == string(TaskSucceeded) && subtask.subtask.Settings != "" {
+		if subtask.GetState() == string(types.TaskSucceeded) && subtask.subtask.Settings != "" {
 			var settings SubtaskSettings
 			if err := tools.Unmarshal([]byte(subtask.subtask.Settings), &settings); err == nil && settings.BranchConfig != nil {
 				t.handleBranchResult(ctx, task, subtask)
@@ -566,7 +582,7 @@ func (t *taskDispatcher) analysisTask(ctx context.Context, task *Task, subtaskMa
 	// state=pending + retry>0 means still retrying, rollback should not be triggered
 	rollbackTriggered := false
 	for _, subtask := range subtaskMap {
-		if subtask.GetState() == string(TaskFailed) {
+		if subtask.GetState() == string(types.TaskFailed) {
 			rollbackTriggered = true
 		}
 	}
@@ -587,8 +603,8 @@ func (t *taskDispatcher) analysisTask(ctx context.Context, task *Task, subtaskMa
 		}
 
 		logger.Info("[analysisTask] task=%s all rollbacks done or no leaves, checking allDone", task.GetID())
-		_, _ = t.TaskDao.SetState(ctx, task.GetID(), string(TaskFailed))
-		task.task.State = string(TaskFailed)
+		_, _ = t.TaskDao.SetState(ctx, task.GetID(), string(types.TaskFailed))
+		task.task.State = string(types.TaskFailed)
 		// Task completed (rollback finished), remove from cache to prevent memory leaks
 		t.taskCache.Delete(task.GetID())
 		return
@@ -598,7 +614,7 @@ func (t *taskDispatcher) analysisTask(ctx context.Context, task *Task, subtaskMa
 	// in the receiver due to a transient DB outage). These subtasks are stuck in
 	// "running" state because the receiver couldn't persist the retry decrement.
 	for _, subtask := range subtaskMap {
-		if subtask.GetState() == string(TaskRunning) && subtask.subtask.Retry > 0 {
+		if subtask.GetState() == string(types.TaskRunning) && subtask.subtask.Retry > 0 {
 			if t.canExecuteSubtask(subtask, false) {
 				logger.Info("[analysisTask] task=%s subtask=%s re-dispatching running subtask (retry=%d)",
 					task.GetID(), subtask.GetID(), subtask.subtask.Retry)
@@ -696,7 +712,7 @@ func (t *taskDispatcher) processBranches(ctx context.Context, task *Task) {
 				if endNode != nil && endNode.state == NodePending {
 					_ = task.SkipSubtask(endKey)
 					// Sync the subtask state in DB to Skipped
-					skipErr := t.SubtaskDao.SetOutputAndState(ctx, endKey, "", string(TaskSkipped))
+					skipErr := t.SubtaskDao.SetOutputAndState(ctx, endKey, "", string(types.TaskSkipped))
 					if skipErr != nil {
 						logger.Error("[processBranches] failed to update DB state for skipped subtask %s: %v", endKey, skipErr)
 					}
@@ -737,9 +753,9 @@ func (t *taskDispatcher) handleBranchResult(ctx context.Context, task *Task, bra
 		}
 		// Find the subtask by name and skip it
 		for _, s := range task.subtaskMap {
-			if s.GetName() == endNodeName && s.subtask.State == string(TaskPending) {
+			if s.GetName() == endNodeName && s.subtask.State == string(types.TaskPending) {
 				_ = task.SkipSubtask(s.GetID())
-				if err := t.SubtaskDao.SetOutputAndState(ctx, s.GetID(), "", string(TaskSkipped)); err != nil {
+				if err := t.SubtaskDao.SetOutputAndState(ctx, s.GetID(), "", string(types.TaskSkipped)); err != nil {
 					logger.Error("[handleBranchResult] failed to skip subtask %s: %v", s.GetID(), err)
 				}
 				logger.Debug("[handleBranchResult] skipped unselected branch target %s (selected: %s)", s.GetID(), selectedKey)
@@ -800,7 +816,7 @@ func (t *taskDispatcher) allocateWorker(ctx context.Context, _runningTasks []*mo
 		affinityConf, exists := taskAffinityMap[taskID]
 		if !exists {
 			affinityConf = affinity{
-				Type:   AffinityRandom,
+				Type:   types.AffinityRandom,
 				Worker: "",
 			}
 		}
@@ -811,7 +827,7 @@ func (t *taskDispatcher) allocateWorker(ctx context.Context, _runningTasks []*mo
 	t.allocateItems(ctx, len(runningTasks), func(i int) (taskID, itemID, currentWorker, affinityNode string) {
 		return runningTasks[i].ID, runningTasks[i].ID, runningTasks[i].Worker, runningTasks[i].Worker
 	}, func(ctx context.Context, i int, nodeName string) (int64, error) {
-		return t.TaskDao.CASWorkerAndState(ctx, runningTasks[i].ID, nodeName, string(TaskRunning), runningTasks[i].Worker)
+		return t.TaskDao.CASWorkerAndState(ctx, runningTasks[i].ID, nodeName, string(types.TaskRunning), runningTasks[i].Worker)
 	}, getAffinity, taskWorkerMap)
 
 	// Build taskWorker lookup table (after task is allocated a worker, subtasks can reference it)
@@ -840,14 +856,14 @@ func (t *taskDispatcher) allocateWorker(ctx context.Context, _runningTasks []*mo
 		}
 		return runningSubtasks[i].TaskID, runningSubtasks[i].ID, runningSubtasks[i].Worker, affNode
 	}, func(ctx context.Context, i int, nodeName string) (int64, error) {
-		return t.SubtaskDao.CASWorkerAndState(ctx, runningSubtasks[i].ID, nodeName, string(TaskRunning), runningSubtasks[i].Worker)
+		return t.SubtaskDao.CASWorkerAndState(ctx, runningSubtasks[i].ID, nodeName, string(types.TaskRunning), runningSubtasks[i].Worker)
 	}, getAffinity, subtaskWorkerMap)
 
 	// Allocate rollback task execution nodes
 	t.allocateItems(ctx, len(runningSubtaskRollbacks), func(i int) (taskID, itemID, currentWorker, affinityNode string) {
 		return runningSubtaskRollbacks[i].TaskID, runningSubtaskRollbacks[i].ID, runningSubtaskRollbacks[i].Worker, runningSubtaskRollbacks[i].Worker
 	}, func(ctx context.Context, i int, nodeName string) (int64, error) {
-		return t.SubtaskDao.CASWorkerAndRollback(ctx, runningSubtaskRollbacks[i].ID, nodeName, string(RollingBack), runningSubtaskRollbacks[i].Worker)
+		return t.SubtaskDao.CASWorkerAndRollback(ctx, runningSubtaskRollbacks[i].ID, nodeName, string(types.RollingBack), runningSubtaskRollbacks[i].Worker)
 	}, getAffinity, subtaskRollbackWorkerMap)
 
 	t.deliverToCluster(ctx, subtaskWorkerMap, deliverSubtask)
@@ -931,7 +947,7 @@ func (t *taskDispatcher) randIntn(n int) int {
 	return v
 }
 
-func (t *taskDispatcher) selectNodeByAffinity(taskAffinityType TaskAffinityType, primaryWorker string, currentNode string) string {
+func (t *taskDispatcher) selectNodeByAffinity(taskAffinityType types.TaskAffinityType, primaryWorker string, currentNode string) string {
 	aliveNodes, lostNodes := t.Cluster.GetAliveNodeNames(), t.Cluster.GetLostNodeNames()
 
 	if len(aliveNodes) == 0 {
@@ -940,7 +956,7 @@ func (t *taskDispatcher) selectNodeByAffinity(taskAffinityType TaskAffinityType,
 	}
 
 	switch taskAffinityType {
-	case AffinityForceSameNode:
+	case types.AffinityForceSameNode:
 		if primaryWorker != "" && tools.StringSliceContains(aliveNodes, primaryWorker) && !tools.StringSliceContains(lostNodes, primaryWorker) {
 			return primaryWorker
 		}
@@ -949,7 +965,7 @@ func (t *taskDispatcher) selectNodeByAffinity(taskAffinityType TaskAffinityType,
 		}
 		// ForceSameNode but no primaryWorker specified and no current worker, pick randomly
 		return aliveNodes[t.randIntn(len(aliveNodes))]
-	case AffinityPreferSameNode:
+	case types.AffinityPreferSameNode:
 		if primaryWorker != "" && tools.StringSliceContains(aliveNodes, primaryWorker) && !tools.StringSliceContains(lostNodes, primaryWorker) {
 			return primaryWorker
 		}
@@ -957,7 +973,7 @@ func (t *taskDispatcher) selectNodeByAffinity(taskAffinityType TaskAffinityType,
 			return currentNode
 		}
 		return aliveNodes[t.randIntn(len(aliveNodes))]
-	case AffinityRandom:
+	case types.AffinityRandom:
 		fallthrough
 	default:
 		if currentNode != "" && !tools.StringSliceContains(lostNodes, currentNode) {
@@ -1164,7 +1180,7 @@ func (t *taskDispatcher) handleTaskImmediately(ctx context.Context, taskIDs []st
 		}
 
 		// Task transitions from Pending -> SubtaskRunning, needs worker allocation and delivery
-		if dbTask.State == string(TaskPending) {
+		if dbTask.State == string(types.TaskPending) {
 			runningTasks = append(runningTasks, dbTask)
 		}
 
@@ -1295,10 +1311,10 @@ func (t *taskDispatcher) refreshSubtaskStates(task *Task, subtasks []model.Subta
 
 		// Sync DAG node state and channel notifications
 		switch dbSubtask.State {
-		case string(TaskPending):
+		case string(types.TaskPending):
 			// After retry, state goes from running -> pending; DAG node needs to revert to NodePending for re-execution
 			_ = task.dag.UpdateNodeState(dbSubtask.ID, NodePending)
-		case string(TaskSucceeded):
+		case string(types.TaskSucceeded):
 			if err := task.dag.UpdateNodeState(dbSubtask.ID, NodeSucceeded); err != nil {
 				logger.Error("[refreshSubtaskStates] UpdateNodeState failed: %v", err)
 			} else {
@@ -1318,16 +1334,38 @@ func (t *taskDispatcher) refreshSubtaskStates(task *Task, subtasks []model.Subta
 					ch.reportValues(map[string]any{dbSubtask.ID: dbSubtask.Output})
 				}
 			}
-		case string(TaskFailed):
+		case string(types.TaskFailed):
 			if err := task.dag.UpdateNodeState(dbSubtask.ID, NodeFailed); err != nil {
 				logger.Error("[refreshSubtaskStates] UpdateNodeState to Failed failed: %v", err)
 			} else {
 				logger.Trace("[refreshSubtaskStates] updated DAG node %s to Failed", dbSubtask.ID)
 			}
-		case string(TaskSkipped):
+		case string(types.TaskSkipped):
 			_ = task.dag.UpdateNodeState(dbSubtask.ID, NodeSkipped)
-		case string(TaskRunning):
+		case string(types.TaskRunning):
 			_ = task.dag.UpdateNodeState(dbSubtask.ID, NodeRunning)
 		}
+	}
+}
+
+func (t *taskDispatcher) backupTask() {
+	cfg := t.cfg.BackUpConfig
+	if cfg.Age <= 0 {
+		cfg.Age = 168 * time.Hour
+	}
+	if len(cfg.FinalStates) == 0 {
+		cfg.FinalStates = []string{string(types.TaskFailed), string(types.TaskSucceeded)}
+	}
+	if cfg.BatchSize <= 0 {
+		cfg.BatchSize = 100
+	}
+
+	count, err := t.BackupManager.BackupTasks(context.Background(), cfg)
+	if err != nil {
+		logger.Error("[backupTask] backup failed. err: %v", err)
+		return
+	}
+	if count > 0 {
+		logger.Info("[backupTask] backed up %d tasks", count)
 	}
 }

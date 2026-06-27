@@ -51,8 +51,8 @@ func TestTableConfig_DefaultValues(t *testing.T) {
 	cfg := DefaultTableConfig()
 	assert.Equal(t, "task", cfg.Task)
 	assert.Equal(t, "subtask", cfg.Subtask)
-	assert.Equal(t, "task_bak", cfg.TaskBak)
-	assert.Equal(t, "subtask_bak", cfg.SubtaskBak)
+	assert.Equal(t, "task_archive", cfg.TaskBak)
+	assert.Equal(t, "subtask_archive", cfg.SubtaskBak)
 	assert.Equal(t, "task_edge", cfg.TaskEdge)
 }
 
@@ -61,8 +61,8 @@ func TestTableConfig_NormalizeFillsEmpty(t *testing.T) {
 	out := cfg.Normalize()
 	assert.Equal(t, "custom_task", out.Task)
 	assert.Equal(t, "subtask", out.Subtask)
-	assert.Equal(t, "task_bak", out.TaskBak)
-	assert.Equal(t, "subtask_bak", out.SubtaskBak)
+	assert.Equal(t, "task_archive", out.TaskBak)
+	assert.Equal(t, "subtask_archive", out.SubtaskBak)
 	assert.Equal(t, "task_edge", out.TaskEdge)
 }
 

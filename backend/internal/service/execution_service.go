@@ -16,8 +16,8 @@ import (
 
 	"github.com/caiflower/dagflow/internal/converter"
 	"github.com/caiflower/dagflow/taskx"
-	taskxDAO "github.com/caiflower/dagflow/taskx/dao"
 	taskxModel "github.com/caiflower/dagflow/taskx/dao/model"
+	t "github.com/caiflower/dagflow/taskx/types"
 )
 
 // Execution 执行记录
@@ -50,8 +50,7 @@ type NodeStatus struct {
 type ExecutionService struct {
 	FlowDAO            *dao.FlowDAO            `autowired:""`
 	ExecutionRecordDAO *dao.ExecutionRecordDAO `autowired:""`
-	TaskDAO            taskxDAO.TaskDAO        `autowired:""`
-	SubtaskDAO         taskxDAO.SubtaskDAO     `autowired:""`
+	TaskQuery          t.TaskQueryService      `autowired:""`
 }
 
 // RunFlowReq 执行 Flow 请求
@@ -135,20 +134,17 @@ func (s *ExecutionService) GetStatus(ctx context.Context, execID string) (*Execu
 	}
 	flowNodes, flowEdges, _ := converter.ParseFlowJSON(flow)
 
-	// 3. 查询 taskx Task 状态
-	taskModel, err := s.TaskDAO.GetByID(ctx, record.TaskID)
-	if err != nil || taskModel == nil {
+	// 3. 用 TaskQueryService 获取 Task + Subtask（含 archive 补查）
+	details, err := s.TaskQuery.GetTasks(ctx, []string{record.TaskID})
+	if err != nil || len(details) == 0 {
 		// taskx 任务不存在，降级为 archived
 		return s.buildArchivedExecution(record), nil
 	}
 
-	// 4. 查询所有 Subtask 状态
-	subtasks, err := s.SubtaskDAO.GetByTaskID(ctx, record.TaskID)
-	if err != nil {
-		subtasks = nil
-	}
+	taskModel := &details[0].Task
+	subtasks := details[0].Subtasks
 
-	// 5. 组装返回结果
+	// 4. 组装返回结果
 	exec := &Execution{
 		ID:        record.ID,
 		FlowID:    record.FlowID,
@@ -171,7 +167,7 @@ func (s *ExecutionService) GetStatus(ctx context.Context, execID string) (*Execu
 	return exec, nil
 }
 
-// ListExecutions 列出执行记录（分页，支持按 flowID 筛选）
+// ListExecutions 查询执行记录列表（含 taskx 状态）
 func (s *ExecutionService) ListExecutions(ctx context.Context, page, pageSize int, flowID string) ([]*Execution, int, error) {
 	records, total, err := s.ExecutionRecordDAO.List(ctx, page, pageSize, flowID)
 	if err != nil {
@@ -182,15 +178,15 @@ func (s *ExecutionService) ListExecutions(ctx context.Context, page, pageSize in
 		return []*Execution{}, total, nil
 	}
 
-	// 批量查询 taskx Task 状态
+	// 批量查询 taskx Task 状态（含 archive 补查）
 	taskIDs := make([]string, 0, len(records))
 	for _, r := range records {
 		taskIDs = append(taskIDs, r.TaskID)
 	}
-	tasks, _ := s.TaskDAO.GetByIDs(ctx, taskIDs)
-	taskMap := make(map[string]*taskxModel.Task, len(tasks))
-	for i := range tasks {
-		taskMap[tasks[i].ID] = &tasks[i]
+	details, _ := s.TaskQuery.GetTasks(ctx, taskIDs)
+	taskMap := make(map[string]*taskxModel.Task, len(details))
+	for i := range details {
+		taskMap[details[i].Task.ID] = &details[i].Task
 	}
 
 	// 组装返回结果
@@ -357,15 +353,15 @@ func topoSort(flowNodes []converter.FlowNode, flowEdges []converter.FlowEdge) []
 // mapTaskxState 将 taskx 状态映射为前端可展示的状态
 func mapTaskxState(state string) string {
 	switch state {
-	case string(taskx.TaskPending):
+	case string(t.TaskPending):
 		return "pending"
-	case string(taskx.TaskRunning), string(taskx.TaskSubtaskRunning):
+	case string(t.TaskRunning):
 		return "running"
-	case string(taskx.TaskSucceeded):
+	case string(t.TaskSucceeded):
 		return "succeeded"
-	case string(taskx.TaskFailed):
+	case string(t.TaskFailed):
 		return "failed"
-	case string(taskx.TaskSkipped):
+	case string(t.TaskSkipped):
 		return "skipped"
 	default:
 		return state

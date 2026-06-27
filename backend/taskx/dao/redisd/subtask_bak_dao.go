@@ -16,12 +16,10 @@ type subtaskBakDAO struct {
 	keys   *keyBuilder
 }
 
-// NewSubtaskBakDAOWithClient creates a Redis-backed SubtaskBakDAO.
 func NewSubtaskBakDAOWithClient(client v2.RedisClient) dao.SubtaskBakDAO {
 	return NewSubtaskBakDAOWithConfig(client, nil)
 }
 
-// NewSubtaskBakDAOWithConfig creates a Redis-backed SubtaskBakDAO with custom key config.
 func NewSubtaskBakDAOWithConfig(client v2.RedisClient, keyCfg *KeyConfig) dao.SubtaskBakDAO {
 	return &subtaskBakDAO{
 		client: client,
@@ -30,10 +28,19 @@ func NewSubtaskBakDAOWithConfig(client v2.RedisClient, keyCfg *KeyConfig) dao.Su
 	}
 }
 
+func (d *subtaskBakDAO) GetStore() dao.Store { return d.store }
+
+func (d *subtaskBakDAO) Insert(_ context.Context, _ *model.SubtaskBak) (int64, error) {
+	return 0, nil
+}
+
+func (d *subtaskBakDAO) BatchInsert(_ context.Context, _ []model.SubtaskBak) (int64, error) {
+	return 0, nil
+}
+
 func (d *subtaskBakDAO) GetByTaskID(ctx context.Context, taskID string) ([]model.SubtaskBak, error) {
 	c := cmd(d.client)
 
-	// Get backup subtask IDs from bak index set
 	ids, err := c.SMembers(ctx, d.keys.bakSubtaskIndexKey(taskID)).Result()
 	if err != nil {
 		return nil, fmt.Errorf("subtaskBak GetByTaskID SMembers: %w", err)
@@ -42,7 +49,6 @@ func (d *subtaskBakDAO) GetByTaskID(ctx context.Context, taskID string) ([]model
 		return nil, nil
 	}
 
-	// Batch fetch backup subtask details
 	pipe := c.Pipeline()
 	cmds := make([]*redis.MapStringStringCmd, len(ids))
 	for i, id := range ids {

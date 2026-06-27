@@ -31,6 +31,7 @@ import (
 	"github.com/caiflower/dagflow/taskx/dao"
 	"github.com/caiflower/dagflow/taskx/dao/model"
 	"github.com/caiflower/dagflow/taskx/proto"
+	"github.com/caiflower/dagflow/taskx/types"
 )
 
 const (
@@ -373,7 +374,7 @@ func (t *taskReceiver) handleExecutorMissing(ctx context.Context, task *model.Ta
 	subtaskID := subtask.ID
 	logger.Error("[execSubtask] subtask %s executor not found", subtaskID)
 	output := &Output{Err: fmt.Sprintf("executor for task %s/%s not found", task.TaskName, subtask.TaskName)}
-	if err := t.SubtaskDao.SetOutputAndState(ctx, subtaskID, tools.ToJson(output), string(TaskFailed)); err != nil {
+	if err := t.SubtaskDao.SetOutputAndState(ctx, subtaskID, tools.ToJson(output), string(types.TaskFailed)); err != nil {
 		logger.Error("[execSubtask] subtask %s SetOutputAndState failed. err=%v", subtaskID, err)
 	}
 }
@@ -384,7 +385,7 @@ func (t *taskReceiver) handleRollbackExecutorMissing(ctx context.Context, task *
 	subtaskID := subtask.ID
 	logger.Error("[execSubtaskRollback] subtask %s rollback executor not found", subtaskID)
 	output := &Output{RollbackErr: fmt.Sprintf("rollback executor for task %s/%s not found", task.TaskName, subtask.TaskName)}
-	if err := t.SubtaskDao.SetRollbackAndState(ctx, subtaskID, string(RollbackFailed), tools.ToJson(output)); err != nil {
+	if err := t.SubtaskDao.SetRollbackAndState(ctx, subtaskID, string(types.RollbackFailed), tools.ToJson(output)); err != nil {
 		logger.Error("[execSubtaskRollback] subtask %s SetRollbackAndState failed. err=%v", subtaskID, err)
 	}
 }
@@ -421,7 +422,7 @@ func (t *taskReceiver) persistSubtaskOutcome(ctx context.Context, bag *SubtaskBa
 		}
 
 		_output.Err = execErr.Error()
-		if err := t.SubtaskDao.SetOutputAndState(ctx, subtaskID, tools.ToJson(_output), string(TaskFailed)); err != nil {
+		if err := t.SubtaskDao.SetOutputAndState(ctx, subtaskID, tools.ToJson(_output), string(types.TaskFailed)); err != nil {
 			logger.Error("[execSubtask] subtask %s SetOutputAndState failed. err=%v", subtaskID, err)
 		}
 		return
@@ -430,7 +431,7 @@ func (t *taskReceiver) persistSubtaskOutcome(ctx context.Context, bag *SubtaskBa
 	bytes, _ := tools.ToByte(output)
 	_output.Output = string(bytes)
 	logger.Trace("[execSubtask] subtask=%s finished, state=Succeeded urgent=%v", subtaskID, bag.task.Urgent)
-	if err := t.SubtaskDao.SetOutputAndState(ctx, subtaskID, tools.ToJson(_output), string(TaskSucceeded)); err != nil {
+	if err := t.SubtaskDao.SetOutputAndState(ctx, subtaskID, tools.ToJson(_output), string(types.TaskSucceeded)); err != nil {
 		logger.Error("[execSubtask] subtask %s SetOutputAndState failed. err=%v", subtaskID, err)
 	}
 }
@@ -448,13 +449,13 @@ func (t *taskReceiver) persistRollbackOutcome(ctx context.Context, bag *SubtaskB
 
 	if execErr != nil {
 		if bag.subtask.Retry > 0 && !errors.Is(execErr, ErrNonRetryable) {
-			if err := t.SubtaskDao.SetRollbackAndState(ctx, subtaskID, string(RollbackPending), tools.ToJson(_output)); err != nil {
+			if err := t.SubtaskDao.SetRollbackAndState(ctx, subtaskID, string(types.RollbackPending), tools.ToJson(_output)); err != nil {
 				logger.Error("[execSubtaskRollback] subtask %s SetRollbackAndState failed. err=%v", subtaskID, err)
 			}
 			if err := t.SubtaskDao.SetRetry(ctx, subtaskID, bag.subtask.Retry-1); err != nil {
 				logger.Error("[execSubtaskRollback] subtask %s SetRetry failed, marking RollbackFailed. err=%v", subtaskID, err)
 				_output.RollbackErr = fmt.Sprintf("SetRetry failed: %v", err)
-				if err2 := t.SubtaskDao.SetRollbackAndState(ctx, subtaskID, string(RollbackFailed), tools.ToJson(_output)); err2 != nil {
+				if err2 := t.SubtaskDao.SetRollbackAndState(ctx, subtaskID, string(types.RollbackFailed), tools.ToJson(_output)); err2 != nil {
 					logger.Error("[execSubtaskRollback] subtask %s SetRollbackAndState(failed) also failed. err=%v", subtaskID, err2)
 				}
 				return
@@ -464,7 +465,7 @@ func (t *taskReceiver) persistRollbackOutcome(ctx context.Context, bag *SubtaskB
 		}
 
 		_output.RollbackErr = execErr.Error()
-		if err := t.SubtaskDao.SetRollbackAndState(ctx, subtaskID, string(RollbackFailed), tools.ToJson(_output)); err != nil {
+		if err := t.SubtaskDao.SetRollbackAndState(ctx, subtaskID, string(types.RollbackFailed), tools.ToJson(_output)); err != nil {
 			logger.Error("[execSubtaskRollback] subtask %s SetRollbackAndState failed. err=%v", subtaskID, err)
 		}
 		return
@@ -473,7 +474,7 @@ func (t *taskReceiver) persistRollbackOutcome(ctx context.Context, bag *SubtaskB
 	bytes, _ := tools.ToByte(output)
 	_output.RollbackOutput = string(bytes)
 	logger.Trace("[execSubtaskRollback] subtask=%s rollback succeeded", subtaskID)
-	if err := t.SubtaskDao.SetRollbackAndState(ctx, subtaskID, string(RollbackSucceeded), tools.ToJson(_output)); err != nil {
+	if err := t.SubtaskDao.SetRollbackAndState(ctx, subtaskID, string(types.RollbackSucceeded), tools.ToJson(_output)); err != nil {
 		logger.Error("[execSubtaskRollback] subtask %s SetRollbackAndState failed. err=%v", subtaskID, err)
 	}
 }

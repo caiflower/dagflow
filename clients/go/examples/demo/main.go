@@ -30,14 +30,17 @@ func processImage(ctx context.Context, input ImageInput) (ImageOutput, error) {
 	}, nil
 }
 
-func echo(ctx context.Context, input string) (string, error) {
-	fmt.Printf("Echo: %s\n", input)
-	return input, nil
+func echo(ctx context.Context, input string) (ImageInput, error) {
+	return ImageInput{
+		URL:    "http://" + input,
+		Width:  1920,
+		Height: 1080,
+	}, nil
 }
 
 func branchSelect(ctx context.Context, input json.RawMessage) (string, error) {
 	fmt.Printf("Branch: selecting 'echo', input=%s\n", string(input))
-	return "task_1782107729290", nil
+	return "task_1781927318318", nil
 }
 
 func processImage1(ctx context.Context, input ImageInput) (ImageOutput, error) {

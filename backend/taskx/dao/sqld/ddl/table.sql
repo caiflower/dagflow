@@ -65,8 +65,8 @@ CREATE TABLE IF NOT EXISTS `task_edge` (
       UNIQUE INDEX idx_id (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
--- 创建 Task 备份表
-CREATE TABLE IF NOT EXISTS `task_bak` (
+-- 创建 Task 归档表
+CREATE TABLE IF NOT EXISTS `task_archive` (
     `id` VARCHAR(50)  PRIMARY KEY COMMENT '任务ID',
     `request_id` VARCHAR(255) COMMENT '请求ID',
     `task_name` VARCHAR(255) COMMENT '任务名称',
@@ -93,8 +93,8 @@ CREATE TABLE IF NOT EXISTS `task_bak` (
     UNIQUE INDEX idx_id (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
--- 创建 SubTask 备份表
-CREATE TABLE IF NOT EXISTS `subtask_bak` (
+-- 创建 SubTask 归档表
+CREATE TABLE IF NOT EXISTS `subtask_archive` (
     `id` VARCHAR(50) PRIMARY KEY COMMENT '子任务ID',
     `task_id` VARCHAR(50) COMMENT '所属任务ID',
     `pre_subtask_id` TEXT COMMENT '前置子任务ID列表',
@@ -115,4 +115,19 @@ CREATE TABLE IF NOT EXISTS `subtask_bak` (
     UNIQUE INDEX idx_id (`id`),
     INDEX idx_task_id (`task_id`),
     INDEX idx_state (`state`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+
+-- 创建 TaskEdge 归档表
+CREATE TABLE IF NOT EXISTS `task_edge_archive` (
+    `id` VARCHAR(50) PRIMARY KEY COMMENT '边ID',
+    `task_id` VARCHAR(50) NOT NULL COMMENT '所属任务ID',
+    `from_subtask_id` VARCHAR(50) NOT NULL COMMENT '源子任务ID',
+    `to_subtask_id` VARCHAR(50) NOT NULL COMMENT '目标子任务ID',
+    `edge_type` VARCHAR(20) NOT NULL DEFAULT 'control+data' COMMENT '边类型(control, data, control+data)',
+    `field_mappings` TEXT COMMENT '字段映射JSON',
+    `create_time` TIMESTAMP(3) COMMENT '创建时间',
+    INDEX idx_task_id (`task_id`),
+    INDEX idx_from (`from_subtask_id`),
+    INDEX idx_to (`to_subtask_id`),
+    UNIQUE INDEX idx_id (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;

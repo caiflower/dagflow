@@ -24,6 +24,7 @@ import (
 	"github.com/caiflower/common-tools/pkg/tools"
 	"github.com/caiflower/dagflow/taskx/dao/model"
 	"github.com/caiflower/dagflow/taskx/executor"
+	"github.com/caiflower/dagflow/taskx/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -154,17 +155,17 @@ func TestTask_ConvertAndRestore(t *testing.T) {
 		subtaskMap[subtaskBeans[i].ID] = subtaskBeans[i]
 	}
 	beanOne := subtaskMap[oneID]
-	beanOne.State = string(TaskSucceeded)
+	beanOne.State = string(types.TaskSucceeded)
 	beanOne.Output = tools.ToJson(map[string]string{"result": "one-done"})
 	subtaskMap[oneID] = beanOne
 
 	beanTwo := subtaskMap[twoID]
-	beanTwo.State = string(TaskSucceeded)
+	beanTwo.State = string(types.TaskSucceeded)
 	beanTwo.Output = tools.ToJson(map[string]string{"result": "two-done"})
 	subtaskMap[twoID] = beanTwo
 
 	beanThree := subtaskMap[threeID]
-	beanThree.State = string(TaskSucceeded)
+	beanThree.State = string(types.TaskSucceeded)
 	beanThree.Output = tools.ToJson(map[string]string{"result": "three-done"})
 	subtaskMap[threeID] = beanThree
 
@@ -185,7 +186,7 @@ func TestTask_ConvertAndRestore(t *testing.T) {
 
 	// Step 3: 模拟 four 完成 -> five 应该可执行
 	beanFour := subtaskMap[fourID]
-	beanFour.State = string(TaskSucceeded)
+	beanFour.State = string(types.TaskSucceeded)
 	beanFour.Output = tools.ToJson(map[string]string{"result": "four-done"})
 	subtaskMap[fourID] = beanFour
 
@@ -204,7 +205,7 @@ func TestTask_ConvertAndRestore(t *testing.T) {
 
 	// Step 4: 模拟 five 完成 -> 任务应该结束
 	beanFive := subtaskMap[fiveID]
-	beanFive.State = string(TaskSucceeded)
+	beanFive.State = string(types.TaskSucceeded)
 	beanFive.Output = tools.ToJson(map[string]string{"result": "five-done"})
 	subtaskMap[fiveID] = beanFive
 
@@ -248,7 +249,7 @@ func TestTask_EdgeTypeInputPrecompute(t *testing.T) {
 	aOutput := map[string]any{"result": "from-a"}
 	aOutputJSON := tools.ToJson(&Output{Output: tools.ToJson(aOutput)})
 	task.subtaskMap[a.GetID()].subtask.Output = aOutputJSON
-	task.subtaskMap[a.GetID()].subtask.State = string(TaskSucceeded)
+	task.subtaskMap[a.GetID()].subtask.State = string(types.TaskSucceeded)
 
 	// convert2Bean → initByBean 模拟 DB 重建
 	taskBean, subtaskBeans, edgeBeans := task.convert2Bean()
@@ -439,8 +440,8 @@ func buildRollbackTask(taskName string, subtasks []*Subtask, edges [][2]*Subtask
 
 	// Set all subtasks to succeeded state with rollback_pending (rollbackable)
 	for i := range subtaskBeans {
-		subtaskBeans[i].State = string(TaskSucceeded)
-		subtaskBeans[i].Rollback = string(RollbackPending)
+		subtaskBeans[i].State = string(types.TaskSucceeded)
+		subtaskBeans[i].Rollback = string(types.RollbackPending)
 	}
 
 	restored := &Task{em: &executorManager{}}
@@ -493,7 +494,7 @@ func TestTask_LeafRollbackSubtasks_PartialRollback(t *testing.T) {
 	task, ids := buildRollbackTask("partial-rb", []*Subtask{a, b, c}, [][2]*Subtask{{a, b}, {b, c}})
 
 	// Simulate C already completed rollback
-	task.subtaskMap[ids["c"]].subtask.Rollback = string(RollbackSucceeded)
+	task.subtaskMap[ids["c"]].subtask.Rollback = string(types.RollbackSucceeded)
 
 	leaves := task.LeafRollbackSubtasks()
 	leafNames := make(map[string]bool)
@@ -518,8 +519,8 @@ func TestTask_LeafRollbackSubtasks_Empty(t *testing.T) {
 	taskBean, subtaskBeans, _ := task.convert2Bean()
 	// All subtasks pending → no rollbackable
 	for i := range subtaskBeans {
-		subtaskBeans[i].State = string(TaskPending)
-		subtaskBeans[i].Rollback = string(NoneRollback)
+		subtaskBeans[i].State = string(types.TaskPending)
+		subtaskBeans[i].Rollback = string(types.NoneRollback)
 	}
 	restored := &Task{em: &executorManager{}}
 	restored, _ = restored.initByBean(taskBean, subtaskBeans, nil)
@@ -547,15 +548,15 @@ func TestTask_LeafRollbackSubtasks_MixedDependents(t *testing.T) {
 	for i := range subtaskBeans {
 		switch subtaskBeans[i].TaskName {
 		case "a":
-			subtaskBeans[i].State = string(TaskSucceeded)
-			subtaskBeans[i].Rollback = string(RollbackPending)
+			subtaskBeans[i].State = string(types.TaskSucceeded)
+			subtaskBeans[i].Rollback = string(types.RollbackPending)
 		case "b":
-			subtaskBeans[i].State = string(TaskSucceeded)
-			subtaskBeans[i].Rollback = string(RollbackPending)
+			subtaskBeans[i].State = string(types.TaskSucceeded)
+			subtaskBeans[i].Rollback = string(types.RollbackPending)
 		case "c":
 			// C is pending → not rollbackable (not succeeded/failed)
-			subtaskBeans[i].State = string(TaskPending)
-			subtaskBeans[i].Rollback = string(NoneRollback)
+			subtaskBeans[i].State = string(types.TaskPending)
+			subtaskBeans[i].Rollback = string(types.NoneRollback)
 		}
 	}
 
@@ -590,11 +591,11 @@ func TestTask_LeafRollbackSubtasks_FailedSubtask(t *testing.T) {
 		nameToID[subtaskBeans[i].TaskName] = subtaskBeans[i].ID
 		switch subtaskBeans[i].TaskName {
 		case "a":
-			subtaskBeans[i].State = string(TaskSucceeded)
-			subtaskBeans[i].Rollback = string(RollbackPending)
+			subtaskBeans[i].State = string(types.TaskSucceeded)
+			subtaskBeans[i].Rollback = string(types.RollbackPending)
 		case "b":
-			subtaskBeans[i].State = string(TaskFailed)
-			subtaskBeans[i].Rollback = string(RollbackPending)
+			subtaskBeans[i].State = string(types.TaskFailed)
+			subtaskBeans[i].Rollback = string(types.RollbackPending)
 		}
 	}
 

@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-package taskx
+package types
 
 // TaskState 任务状态
 type TaskState string
 
 const (
-	TaskPending        TaskState = "pending"
-	TaskRunning        TaskState = "running"
-	TaskSucceeded      TaskState = "succeeded"
-	TaskFailed         TaskState = "failed"
-	TaskSubtaskRunning TaskState = "subtask_running"
-	TaskSkipped        TaskState = "skipped"
+	TaskPending   TaskState = "pending"
+	TaskRunning   TaskState = "running"
+	TaskSucceeded TaskState = "succeeded"
+	TaskFailed    TaskState = "failed"
+	//TaskSubtaskRunning TaskState = "subtask_running"
+	TaskSkipped TaskState = "skipped"
 )
 
 // TaskRollbackState 任务回滚状态

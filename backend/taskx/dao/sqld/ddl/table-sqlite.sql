@@ -68,8 +68,8 @@ CREATE INDEX IF NOT EXISTS idx_task_edge_task_id ON task_edge(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_edge_from ON task_edge(from_subtask_id);
 CREATE INDEX IF NOT EXISTS idx_task_edge_to ON task_edge(to_subtask_id);
 
--- 4. 创建task_bak表（无内联索引）
-CREATE TABLE IF NOT EXISTS task_bak (
+-- 4. 创建task_archive归档表（无内联索引）
+CREATE TABLE IF NOT EXISTS task_archive (
     id VARCHAR(50) PRIMARY KEY /* 任务ID */,
     request_id VARCHAR(255) /* 请求ID */,
     task_name VARCHAR(255) /* 任务名称 */,
@@ -90,15 +90,15 @@ CREATE TABLE IF NOT EXISTS task_bak (
     rollback_strategy VARCHAR(20) NOT NULL DEFAULT 'rollback_all' /* 回滚策略(rollback_all, rollback_failed, rollback_custom) */
     );
 
--- 为task_bak表创建索引
-CREATE INDEX IF NOT EXISTS idx_task_bak_request_id ON task_bak(request_id);
-CREATE INDEX IF NOT EXISTS idx_task_bak_state ON task_bak(state);
-CREATE INDEX IF NOT EXISTS idx_task_bak_execute_time ON task_bak(execute_time);
-CREATE INDEX IF NOT EXISTS idx_task_bak_affinity_type ON task_bak(affinity_type);
-CREATE INDEX IF NOT EXISTS idx_task_bak_primary_worker ON task_bak(primary_worker);
+-- 为task_archive表创建索引
+CREATE INDEX IF NOT EXISTS idx_task_archive_request_id ON task_archive(request_id);
+CREATE INDEX IF NOT EXISTS idx_task_archive_state ON task_archive(state);
+CREATE INDEX IF NOT EXISTS idx_task_archive_execute_time ON task_archive(execute_time);
+CREATE INDEX IF NOT EXISTS idx_task_archive_affinity_type ON task_archive(affinity_type);
+CREATE INDEX IF NOT EXISTS idx_task_archive_primary_worker ON task_archive(primary_worker);
 
--- 5. 创建subtask_bak表（无内联索引）
-CREATE TABLE IF NOT EXISTS subtask_bak (
+-- 5. 创建subtask_archive归档表（无内联索引）
+CREATE TABLE IF NOT EXISTS subtask_archive (
     id VARCHAR(50) PRIMARY KEY /* 子任务ID */,
     task_id VARCHAR(50) /* 所属任务ID */,
     pre_subtask_id TEXT /* 前置子任务ID列表 */,
@@ -118,6 +118,22 @@ CREATE TABLE IF NOT EXISTS subtask_bak (
     settings VARCHAR(4096) NOT NULL DEFAULT '' /* extensible JSON config (branch_config, etc.) */
     );
 
--- 为subtask_bak表创建索引
-CREATE INDEX IF NOT EXISTS idx_subtask_bak_task_id ON subtask_bak(task_id);
-CREATE INDEX IF NOT EXISTS idx_subtask_bak_state ON subtask_bak(state);
+-- 为subtask_archive表创建索引
+CREATE INDEX IF NOT EXISTS idx_subtask_archive_task_id ON subtask_archive(task_id);
+CREATE INDEX IF NOT EXISTS idx_subtask_archive_state ON subtask_archive(state);
+
+-- 6. 创建task_edge_archive归档表
+CREATE TABLE IF NOT EXISTS task_edge_archive (
+    id VARCHAR(50) PRIMARY KEY /* 边ID */,
+    task_id VARCHAR(50) NOT NULL /* 所属任务ID */,
+    from_subtask_id VARCHAR(50) NOT NULL /* 源子任务ID */,
+    to_subtask_id VARCHAR(50) NOT NULL /* 目标子任务ID */,
+    edge_type VARCHAR(20) NOT NULL DEFAULT 'control+data' /* 边类型(control, data, control+data) */,
+    field_mappings TEXT /* 字段映射JSON */,
+    create_time TIMESTAMP(3) /* 创建时间 */
+);
+
+-- 为task_edge_archive表创建索引
+CREATE INDEX IF NOT EXISTS idx_task_edge_archive_task_id ON task_edge_archive(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_edge_archive_from ON task_edge_archive(from_subtask_id);
+CREATE INDEX IF NOT EXISTS idx_task_edge_archive_to ON task_edge_archive(to_subtask_id);

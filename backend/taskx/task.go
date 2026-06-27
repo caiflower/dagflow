@@ -32,6 +32,7 @@ import (
 	"github.com/caiflower/common-tools/pkg/tools"
 	"github.com/caiflower/dagflow/taskx/dao/model"
 	"github.com/caiflower/dagflow/taskx/executor"
+	"github.com/caiflower/dagflow/taskx/types"
 )
 
 // ErrExecutorNotFound is returned when an executor is not found
@@ -64,10 +65,10 @@ func NewTask(taskName string) *Task {
 		task: model.Task{
 			ID:            tools.GenerateId("t"),
 			TaskName:      taskName,
-			State:         string(TaskPending),
-			Retry:         DefaultRetryCount,
-			RetryInterval: DefaultRetryInterval,
-			AffinityType:  string(AffinityRandom),
+			State:         string(types.TaskPending),
+			Retry:         types.DefaultRetryCount,
+			RetryInterval: types.DefaultRetryInterval,
+			AffinityType:  string(types.AffinityRandom),
 		},
 		dag:              NewDAGGraph(),
 		subtaskMap:       make(map[string]*Subtask),
@@ -101,10 +102,10 @@ func NewSubtask(name string, provider executor.ExecutorProvider) *Subtask {
 		subtask: model.Subtask{
 			ID:            tools.GenerateId("st"),
 			TaskName:      name,
-			State:         string(TaskPending),
-			Retry:         DefaultRetryCount,
-			RetryInterval: DefaultRetryInterval,
-			Rollback:      string(RollbackPending),
+			State:         string(types.TaskPending),
+			Retry:         types.DefaultRetryCount,
+			RetryInterval: types.DefaultRetryInterval,
+			Rollback:      string(types.RollbackPending),
 		},
 		triggerMode: AllPredecessor,
 		provider:    provider,
@@ -263,20 +264,20 @@ func (s *Subtask) unmarshalOutput(v interface{}) error {
 
 // IsFinished checks whether the subtask is finished
 func (s *Subtask) IsFinished() bool {
-	return s.subtask.State == string(TaskSucceeded) || s.subtask.State == string(TaskFailed)
+	return s.subtask.State == string(types.TaskSucceeded) || s.subtask.State == string(types.TaskFailed)
 }
 
 // IsSkipped checks whether the subtask is skipped
 func (s *Subtask) IsSkipped() bool {
-	return s.subtask.State == string(TaskSkipped)
+	return s.subtask.State == string(types.TaskSkipped)
 }
 
 // isRollbackFinished checks whether the rollback is complete (internal use)
 func (s *Subtask) isRollbackFinished() bool {
 	rollback := s.getRollback()
-	return TaskRollbackState(rollback) == RollbackFailed ||
-		TaskRollbackState(rollback) == RollbackSucceeded ||
-		TaskRollbackState(rollback) == NoneRollback
+	return types.TaskRollbackState(rollback) == types.RollbackFailed ||
+		types.TaskRollbackState(rollback) == types.RollbackSucceeded ||
+		types.TaskRollbackState(rollback) == types.NoneRollback
 }
 
 // getRollback returns the rollback state (internal use)
@@ -346,7 +347,7 @@ func (t *Task) SetExecuteTime(executeTime time.Time) *Task {
 }
 
 // SetAffinityType sets the affinity type
-func (t *Task) SetAffinityType(affinityType TaskAffinityType) *Task {
+func (t *Task) SetAffinityType(affinityType types.TaskAffinityType) *Task {
 	t.task.AffinityType = string(affinityType)
 	return t
 }
@@ -358,8 +359,8 @@ func (t *Task) SetUrgent() *Task {
 }
 
 // getAffinityType returns the affinity type (internal use)
-func (t *Task) getAffinityType() TaskAffinityType {
-	return TaskAffinityType(t.task.AffinityType)
+func (t *Task) getAffinityType() types.TaskAffinityType {
+	return types.TaskAffinityType(t.task.AffinityType)
 }
 
 // getPrimaryWorker returns the primary worker node (internal use)
@@ -632,13 +633,13 @@ func (t *Task) UpdateSubtaskState(subtaskID string, state NodeState) error {
 
 	switch state {
 	case NodeSucceeded:
-		subtask.subtask.State = string(TaskSucceeded)
+		subtask.subtask.State = string(types.TaskSucceeded)
 	case NodeFailed:
-		subtask.subtask.State = string(TaskFailed)
+		subtask.subtask.State = string(types.TaskFailed)
 	case NodeSkipped:
-		subtask.subtask.State = string(TaskSkipped)
+		subtask.subtask.State = string(types.TaskSkipped)
 	case NodeRunning:
-		subtask.subtask.State = string(TaskRunning)
+		subtask.subtask.State = string(types.TaskRunning)
 		now := time.Now()
 		subtask.subtask.LastRunTime = basic.Time(now)
 	}
@@ -685,7 +686,7 @@ func (t *Task) SkipSubtask(subtaskID string) error {
 
 // IsFinished checks whether the task is finished
 func (t *Task) IsFinished() bool {
-	if t.task.State == string(TaskFailed) || t.task.State == string(TaskSucceeded) {
+	if t.task.State == string(types.TaskFailed) || t.task.State == string(types.TaskSucceeded) {
 		return true
 	}
 	if t.compiled != nil {
@@ -786,9 +787,9 @@ func (t *Task) GetRollbackableSubtasks() []string {
 
 	// Collect completed and failed subtasks
 	for _, subtask := range t.subtaskMap {
-		if subtask.subtask.State == string(TaskSucceeded) {
+		if subtask.subtask.State == string(types.TaskSucceeded) {
 			completed = append(completed, subtask.GetID())
-		} else if subtask.subtask.State == string(TaskFailed) {
+		} else if subtask.subtask.State == string(types.TaskFailed) {
 			failedList = append(failedList, subtask.GetID())
 		}
 	}
@@ -1238,7 +1239,7 @@ func (t *Task) initByBean(taskBean *model.Task, subtaskBeans []model.Subtask, ed
 	// Restore DAG node state based on DB state (critical: otherwise completed nodes cannot notify successors)
 	for _, subtask := range t.subtaskMap {
 		switch subtask.subtask.State {
-		case string(TaskSucceeded):
+		case string(types.TaskSucceeded):
 			_ = t.dag.UpdateNodeState(subtask.GetID(), NodeSucceeded)
 			if ch := t.compiled.GetChannel(subtask.GetID()); ch != nil {
 				ch.reportDependencies(nil)
@@ -1255,11 +1256,11 @@ func (t *Task) initByBean(taskBean *model.Task, subtaskBeans []model.Subtask, ed
 					ch.reportValues(map[string]any{subtask.GetID(): subtask.subtask.Output})
 				}
 			}
-		case string(TaskFailed):
+		case string(types.TaskFailed):
 			_ = t.dag.UpdateNodeState(subtask.GetID(), NodeFailed)
-		case string(TaskSkipped):
+		case string(types.TaskSkipped):
 			_ = t.dag.UpdateNodeState(subtask.GetID(), NodeSkipped)
-		case string(TaskRunning):
+		case string(types.TaskRunning):
 			_ = t.dag.UpdateNodeState(subtask.GetID(), NodeRunning)
 		}
 	}
@@ -1277,24 +1278,24 @@ func (t *Task) getState() string {
 func (e EdgeType) toDBString() string {
 	switch e {
 	case ControlEdge:
-		return EdgeTypeControl
+		return types.EdgeTypeControl
 	case DataEdge:
-		return EdgeTypeData
+		return types.EdgeTypeData
 	case ControlAndDataEdge:
-		return EdgeTypeControlAndData
+		return types.EdgeTypeControlAndData
 	default:
-		return EdgeTypeControlAndData
+		return types.EdgeTypeControlAndData
 	}
 }
 
 // edgeTypeFromDBString restores EdgeType from a DB string
 func edgeTypeFromDBString(s string) EdgeType {
 	switch s {
-	case EdgeTypeControl:
+	case types.EdgeTypeControl:
 		return ControlEdge
-	case EdgeTypeData:
+	case types.EdgeTypeData:
 		return DataEdge
-	case EdgeTypeControlAndData:
+	case types.EdgeTypeControlAndData:
 		return ControlAndDataEdge
 	default:
 		return ControlAndDataEdge
@@ -1305,20 +1306,20 @@ func edgeTypeFromDBString(s string) EdgeType {
 func (m NodeTriggerMode) toDBString() string {
 	switch m {
 	case AllPredecessor:
-		return TriggerModeAllPredecessor
+		return types.TriggerModeAllPredecessor
 	case AnyPredecessor:
-		return TriggerModeAnyPredecessor
+		return types.TriggerModeAnyPredecessor
 	default:
-		return TriggerModeAllPredecessor
+		return types.TriggerModeAllPredecessor
 	}
 }
 
 // triggerModeFromDBString restores NodeTriggerMode from a DB string
 func triggerModeFromDBString(s string) NodeTriggerMode {
 	switch s {
-	case TriggerModeAllPredecessor:
+	case types.TriggerModeAllPredecessor:
 		return AllPredecessor
-	case TriggerModeAnyPredecessor:
+	case types.TriggerModeAnyPredecessor:
 		return AnyPredecessor
 	default:
 		return AllPredecessor
@@ -1329,24 +1330,24 @@ func triggerModeFromDBString(s string) NodeTriggerMode {
 func (s RollbackStrategy) toDBString() string {
 	switch s {
 	case StrategyRollbackAll:
-		return RollbackStrategyAll
+		return types.RollbackStrategyAll
 	case StrategyRollbackFailed:
-		return RollbackStrategyFailed
+		return types.RollbackStrategyFailed
 	case StrategyRollbackCustom:
-		return RollbackStrategyCustom
+		return types.RollbackStrategyCustom
 	default:
-		return RollbackStrategyAll
+		return types.RollbackStrategyAll
 	}
 }
 
 // rollbackStrategyFromDBString restores RollbackStrategy from a DB string
 func rollbackStrategyFromDBString(s string) RollbackStrategy {
 	switch s {
-	case RollbackStrategyAll:
+	case types.RollbackStrategyAll:
 		return StrategyRollbackAll
-	case RollbackStrategyFailed:
+	case types.RollbackStrategyFailed:
 		return StrategyRollbackFailed
-	case RollbackStrategyCustom:
+	case types.RollbackStrategyCustom:
 		return StrategyRollbackCustom
 	default:
 		return StrategyRollbackAll

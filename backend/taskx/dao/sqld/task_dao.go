@@ -110,6 +110,21 @@ func (d *taskDAO) GetTodoTask(ctx context.Context, taskState []string, t basic.T
 	return res, err
 }
 
+func (d *taskDAO) GetOldTasks(ctx context.Context, taskState []string, beforeCreateTime basic.Time) ([]model.Task, error) {
+	var res []model.Task
+	err := d.client.GetDB().NewSelect().
+		Model(&res).
+		ModelTableExpr(d.tableName).
+		Where("state IN (?)", bun.List(taskState)).
+		Where("create_time < ?", beforeCreateTime.DBString()).
+		Where("status = ?", 1).
+		Scan(ctx, &res)
+	if err != nil {
+		return nil, err
+	}
+	return res, err
+}
+
 func (d *taskDAO) CASWorkerAndState(ctx context.Context, id string, worker, state string, oldWorker string) (int64, error) {
 	return d.client.GetRowsAffected(
 		d.db(ctx).NewUpdate().

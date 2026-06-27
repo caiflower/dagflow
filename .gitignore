@@ -33,3 +33,7 @@ hertz
 go.work*backend/server
 backend/server
 .DS_Store
+.codegraph
+package-lock.json
+package.json
+node_modules

@@ -9,7 +9,7 @@ import (
 
 // SubtaskBak generate from table subtask_bak
 type SubtaskBak struct {
-	bun.BaseModel `bun:"table:subtask_bak"`
+	bun.BaseModel `bun:"table:subtask_archive"`
 	ID            string     `bun:"id,pk,notnull" json:"id"`             // 子任务ID
 	TaskID        string     `bun:"task_id" json:"taskID"`               // 所属任务ID
 	PreSubtaskID  string     `bun:"pre_subtask_id" json:"preSubtaskID"`  // 前置子任务ID列表

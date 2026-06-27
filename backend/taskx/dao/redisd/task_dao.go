@@ -154,6 +154,52 @@ func (d *taskDAO) GetTodoTask(ctx context.Context, taskState []string, t basic.T
 	return tasks, nil
 }
 
+func (d *taskDAO) GetOldTasks(ctx context.Context, taskState []string, beforeCreateTime basic.Time) ([]model.Task, error) {
+	c := cmd(d.client)
+	score := float64(beforeCreateTime.Time().Unix())
+
+	ids, err := c.ZRangeByScore(ctx, d.keys.todoSetKey(), &redis.ZRangeBy{
+		Min: "-inf",
+		Max: fmt.Sprintf("%f", score),
+	}).Result()
+	if err != nil {
+		return nil, fmt.Errorf("task GetOldTasks ZRangeByScore: %w", err)
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	stateSet := make(map[string]bool, len(taskState))
+	for _, s := range taskState {
+		stateSet[s] = true
+	}
+
+	pipe := c.Pipeline()
+	hashCmds := make([]*redis.MapStringStringCmd, len(ids))
+	for i, id := range ids {
+		hashCmds[i] = pipe.HGetAll(ctx, d.keys.taskKey(id))
+	}
+	if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
+		return nil, fmt.Errorf("task GetOldTasks pipeline: %w", err)
+	}
+
+	var tasks []model.Task
+	for _, hcmd := range hashCmds {
+		m, err := hcmd.Result()
+		if err != nil || len(m) == 0 {
+			continue
+		}
+		task := new(model.Task)
+		if err := fromHash(m, task); err != nil {
+			continue
+		}
+		if task.Status > 0 && stateSet[task.State] {
+			tasks = append(tasks, *task)
+		}
+	}
+	return tasks, nil
+}
+
 func (d *taskDAO) CASWorkerAndState(ctx context.Context, taskID string, worker, state string, oldWorker string) (int64, error) {
 	c := cmd(d.client)
 	result, err := casWorkerAndState.Run(ctx, c, []string{d.keys.taskKey(taskID)}, oldWorker, worker, state).Int64()

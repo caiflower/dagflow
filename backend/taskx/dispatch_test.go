@@ -31,10 +31,12 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/caiflower/common-tools/web/common/json"
+	"github.com/caiflower/dagflow/taskx/backup"
 	"github.com/caiflower/dagflow/taskx/dao/model"
 	"github.com/caiflower/dagflow/taskx/dao/redisd"
 	"github.com/caiflower/dagflow/taskx/dao/sqld"
 	"github.com/caiflower/dagflow/taskx/executor"
+	"github.com/caiflower/dagflow/taskx/types"
 
 	"github.com/caiflower/common-tools/cluster"
 	dbv1 "github.com/caiflower/common-tools/db/v1"
@@ -237,6 +239,10 @@ func commonTaskx(cluster1, cluster2, cluster3 cluster.ICluster) (dispatcher1, di
 
 	cfg := &Config{
 		RemoteCallTimeout: time.Second * 3,
+		BackUpConfig: BackupConfig{
+			Age:       time.Hour * 24,
+			BatchSize: 100,
+		},
 	}
 
 	newReceiver := func(c cluster.ICluster) *taskReceiver {
@@ -257,13 +263,22 @@ func commonTaskx(cluster1, cluster2, cluster3 cluster.ICluster) (dispatcher1, di
 	}
 	newDispatcher := func(c cluster.ICluster, r *taskReceiver) *taskDispatcher {
 		return &taskDispatcher{
-			Cluster:                c,
-			TaskDao:                taskDao,
-			TaskBakDao:             taskBakDao,
-			SubtaskDao:             subtaskDao,
-			SubtaskBakDao:          subtaskBakDao,
-			TaskEdgeDao:            taskEdgeDao,
-			DBClient:               client,
+			Cluster:       c,
+			TaskDao:       taskDao,
+			TaskBakDao:    taskBakDao,
+			SubtaskDao:    subtaskDao,
+			SubtaskBakDao: subtaskBakDao,
+			TaskEdgeDao:   taskEdgeDao,
+			DBClient:      client,
+			BackupManager: &backup.SQLBackupManager{
+				DBClient:       client,
+				TaskDao:        taskDao,
+				TaskBakDao:     taskBakDao,
+				SubtaskDao:     subtaskDao,
+				SubtaskBakDao:  subtaskBakDao,
+				TaskEdgeDao:    taskEdgeDao,
+				TaskEdgeBakDao: sqld.NewTaskEdgeArchiveDAOWithClient(client),
+			},
 			cfg:                    cfg,
 			TaskReceiver:           r,
 			allocateWorkerInflight: inflight.NewInFlight(),
@@ -499,10 +514,10 @@ func submitRollbackTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, done c
 	assert.Equal(t, true, isRollbackFinished(dbTwo.Rollback), "check rollback finished failed")
 	assert.Equal(t, true, isRollbackFinished(dbThree.Rollback), "check rollback finished failed")
 	assert.Equal(t, true, isRollbackFinished(dbFour.Rollback), "check rollback finished failed")
-	assert.Equal(t, true, TaskRollbackState(dbOne.Rollback) == NoneRollback, "check noneRollback rollback failed")
-	assert.Equal(t, true, TaskRollbackState(dbFive.Rollback) == NoneRollback, "check noneRollback rollback failed")
+	assert.Equal(t, true, types.TaskRollbackState(dbOne.Rollback) == types.NoneRollback, "check noneRollback rollback failed")
+	assert.Equal(t, true, types.TaskRollbackState(dbFive.Rollback) == types.NoneRollback, "check noneRollback rollback failed")
 
-	assert.Equal(t, string(TaskFailed), dbFour.State, "check subtask state failed")
+	assert.Equal(t, string(types.TaskFailed), dbFour.State, "check subtask state failed")
 	assert.Equal(t, int8(0), dbFour.Retry, "check subtask retryCount failed")
 	assert.Equal(t, false, isFinished(dbFive.State), "check subtask finish state failed")
 
@@ -522,8 +537,8 @@ func submitNonRetryTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, done c
 	_, dbSubTasks, _ := submitAndWait(t, dispatcher, task)
 
 	dbOne := dbSubTasks[0]
-	assert.Equal(t, string(TaskFailed), dbOne.State, "check task state failed")
-	assert.Equal(t, int8(DefaultRetryCount), dbOne.Retry, "check task retryCount failed")
+	assert.Equal(t, string(types.TaskFailed), dbOne.State, "check task state failed")
+	assert.Equal(t, int8(types.DefaultRetryCount), dbOne.Retry, "check task retryCount failed")
 
 	done <- struct{}{}
 }
@@ -531,7 +546,7 @@ func submitNonRetryTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, done c
 func submitAffinityTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, done chan struct{}) {
 	task := NewTask(taskDemoName).
 		SetInput("affinity test input").
-		SetAffinityType(AffinityForceSameNode)
+		SetAffinityType(types.AffinityForceSameNode)
 
 	subtask := NewSubtask(stepOne, executor.NewLocalExecutor(echoInput)).SetInput(map[string]any{"name": stepOne})
 	subtask2 := NewSubtask(stepTwo, executor.NewLocalExecutor(echoInput)).SetInput(map[string]any{"name": stepTwo})
@@ -577,7 +592,7 @@ func submitScheduleTask(t *testing.T, dispatcher *taskDispatcher, done chan<- st
 
 	dbTask, dbSubTasks, _ := submitAndWait(t, dispatcher, task)
 
-	assert.Equal(t, string(TaskSucceeded), dbTask.State, "check task state failed")
+	assert.Equal(t, string(types.TaskSucceeded), dbTask.State, "check task state failed")
 	for _, subTask := range dbSubTasks {
 		assert.Equal(t, true, isFinished(subTask.State), "check subtask finished failed")
 		assert.Equal(t, true, !subTask.LastRunTime.Time().Before(executeTime),
@@ -595,7 +610,7 @@ func submitPanicTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, done chan
 	_, dbSubTasks, _ := submitAndWait(t, dispatcher, task)
 
 	for _, subtask := range dbSubTasks {
-		if subtask.State == string(TaskFailed) {
+		if subtask.State == string(types.TaskFailed) {
 			var output Output
 			_ = json.Unmarshal([]byte(subtask.Output), &output)
 			assert.Contains(t, output.Err, "panic occurred during execution")
@@ -635,11 +650,11 @@ func submitBranchTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, done cha
 
 	dbTask, _, subtaskMap := submitAndWait(t, dispatcher, task)
 
-	assert.Equal(t, string(TaskSucceeded), dbTask.State, "branch task should succeed")
-	assertSubtaskState(t, subtaskMap, "start", string(TaskSucceeded))
-	assertSubtaskState(t, subtaskMap, "pathA", string(TaskSucceeded))
-	assertSubtaskState(t, subtaskMap, "pathB", string(TaskSkipped))
-	assertSubtaskState(t, subtaskMap, "end", string(TaskSucceeded))
+	assert.Equal(t, string(types.TaskSucceeded), dbTask.State, "branch task should succeed")
+	assertSubtaskState(t, subtaskMap, "start", string(types.TaskSucceeded))
+	assertSubtaskState(t, subtaskMap, "pathA", string(types.TaskSucceeded))
+	assertSubtaskState(t, subtaskMap, "pathB", string(types.TaskSkipped))
+	assertSubtaskState(t, subtaskMap, "end", string(types.TaskSucceeded))
 
 	done <- struct{}{}
 }
@@ -686,13 +701,13 @@ func submitNestedBranchTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, do
 
 	dbTask, _, subtaskMap := submitAndWait(t, dispatcher, task)
 
-	assert.Equal(t, string(TaskSucceeded), dbTask.State, "nested branch task should succeed")
-	assertSubtaskState(t, subtaskMap, "start", string(TaskSucceeded))
-	assertSubtaskState(t, subtaskMap, "outerA", string(TaskSucceeded))
-	assertSubtaskState(t, subtaskMap, "outerB", string(TaskSkipped))
-	assertSubtaskState(t, subtaskMap, "innerA1", string(TaskSucceeded))
-	assertSubtaskState(t, subtaskMap, "innerA2", string(TaskSkipped))
-	assertSubtaskState(t, subtaskMap, "end", string(TaskSucceeded))
+	assert.Equal(t, string(types.TaskSucceeded), dbTask.State, "nested branch task should succeed")
+	assertSubtaskState(t, subtaskMap, "start", string(types.TaskSucceeded))
+	assertSubtaskState(t, subtaskMap, "outerA", string(types.TaskSucceeded))
+	assertSubtaskState(t, subtaskMap, "outerB", string(types.TaskSkipped))
+	assertSubtaskState(t, subtaskMap, "innerA1", string(types.TaskSucceeded))
+	assertSubtaskState(t, subtaskMap, "innerA2", string(types.TaskSkipped))
+	assertSubtaskState(t, subtaskMap, "end", string(types.TaskSucceeded))
 
 	done <- struct{}{}
 }
@@ -727,11 +742,11 @@ func submitBranchProviderTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, 
 
 	dbTask, _, subtaskMap := submitAndWait(t, dispatcher, task)
 
-	assert.Equal(t, string(TaskSucceeded), dbTask.State, "branch provider task should succeed")
-	assertSubtaskState(t, subtaskMap, "start", string(TaskSucceeded))
-	assertSubtaskState(t, subtaskMap, "pathA", string(TaskSucceeded))
-	assertSubtaskState(t, subtaskMap, "pathB", string(TaskSkipped))
-	assertSubtaskState(t, subtaskMap, "end", string(TaskSucceeded))
+	assert.Equal(t, string(types.TaskSucceeded), dbTask.State, "branch provider task should succeed")
+	assertSubtaskState(t, subtaskMap, "start", string(types.TaskSucceeded))
+	assertSubtaskState(t, subtaskMap, "pathA", string(types.TaskSucceeded))
+	assertSubtaskState(t, subtaskMap, "pathB", string(types.TaskSkipped))
+	assertSubtaskState(t, subtaskMap, "end", string(types.TaskSucceeded))
 
 	done <- struct{}{}
 }
@@ -799,7 +814,7 @@ func TestBranchSettingsPersistenceRoundtrip(t *testing.T) {
 	// initByBean: deserialize (simulate DB roundtrip)
 	restoredTask := &Task{dag: NewDAGGraph(), subtaskMap: make(map[string]*Subtask)}
 	_, err = restoredTask.initByBean(&model.Task{
-		ID: task.GetID(), TaskName: taskName, State: string(TaskPending),
+		ID: task.GetID(), TaskName: taskName, State: string(types.TaskPending),
 	}, subtaskBeans, edgeBeans)
 	assert.NoError(t, err, "initByBean should not fail")
 
@@ -870,14 +885,14 @@ func submitRollbackFailedTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, 
 	dbThree := subtaskMap[stepThree]
 
 	// three failed and has rollback executor → should be rolled back
-	assert.Equal(t, string(TaskFailed), dbThree.State, "three should be failed")
+	assert.Equal(t, string(types.TaskFailed), dbThree.State, "three should be failed")
 	assert.Equal(t, true, isRollbackFinished(dbThree.Rollback), "three rollback should be finished")
 
 	// one and two succeeded → with StrategyRollbackFailed, they should NOT be rolled back
-	assert.Equal(t, string(TaskSucceeded), dbOne.State, "one should be succeeded")
-	assert.Equal(t, string(TaskSucceeded), dbTwo.State, "two should be succeeded")
-	assert.Equal(t, string(RollbackPending), dbOne.Rollback, "one should still be rollback_pending (not rolled back)")
-	assert.Equal(t, string(RollbackPending), dbTwo.Rollback, "two should still be rollback_pending (not rolled back)")
+	assert.Equal(t, string(types.TaskSucceeded), dbOne.State, "one should be succeeded")
+	assert.Equal(t, string(types.TaskSucceeded), dbTwo.State, "two should be succeeded")
+	assert.Equal(t, string(types.RollbackPending), dbOne.Rollback, "one should still be rollback_pending (not rolled back)")
+	assert.Equal(t, string(types.RollbackPending), dbTwo.Rollback, "two should still be rollback_pending (not rolled back)")
 
 	done <- struct{}{}
 }
@@ -927,15 +942,15 @@ func submitRollbackCustomTaskAndCheck(t *testing.T, dispatcher *taskDispatcher, 
 	dbFour := subtaskMap[stepFour]
 
 	// four failed
-	assert.Equal(t, string(TaskFailed), dbFour.State, "four should be failed")
+	assert.Equal(t, string(types.TaskFailed), dbFour.State, "four should be failed")
 
 	// one and three were selected by custom func → should be rolled back
 	assert.Equal(t, true, isRollbackFinished(dbOne.Rollback), "one rollback should be finished (selected by custom)")
 	assert.Equal(t, true, isRollbackFinished(dbThree.Rollback), "three rollback should be finished (selected by custom)")
 
 	// two was NOT selected by custom func → should remain rollback_pending
-	assert.Equal(t, string(TaskSucceeded), dbTwo.State, "two should be succeeded")
-	assert.Equal(t, string(RollbackPending), dbTwo.Rollback, "two should still be rollback_pending (not selected by custom)")
+	assert.Equal(t, string(types.TaskSucceeded), dbTwo.State, "two should be succeeded")
+	assert.Equal(t, string(types.RollbackPending), dbTwo.Rollback, "two should still be rollback_pending (not selected by custom)")
 
 	done <- struct{}{}
 }
@@ -965,12 +980,12 @@ func submitFailedNoRollbackTaskAndCheck(t *testing.T, dispatcher *taskDispatcher
 	dbTwo := subtaskMap[stepTwo]
 
 	// two should have failed (exhausted retries)
-	assert.Equal(t, string(TaskFailed), dbTwo.State, "stepTwo should be failed")
+	assert.Equal(t, string(types.TaskFailed), dbTwo.State, "stepTwo should be failed")
 	assert.Equal(t, int8(0), dbTwo.Retry, "stepTwo retry should be 0 (exhausted)")
-	assert.Equal(t, string(TaskFailed), taskDB.State, "task should be failed")
+	assert.Equal(t, string(types.TaskFailed), taskDB.State, "task should be failed")
 
 	// one should have succeeded (ran before the failure)
-	assert.Equal(t, string(TaskSucceeded), dbOne.State, "stepOne should be succeeded")
+	assert.Equal(t, string(types.TaskSucceeded), dbOne.State, "stepOne should be succeeded")
 
 	done <- struct{}{}
 }
@@ -1075,6 +1090,10 @@ func commonTaskxRedis(cluster1, cluster2, cluster3 cluster.ICluster, rc v2.Redis
 		RemoteCallTimeout: time.Second * 3,
 		StorageBackend:    "redis",
 		RedisClient:       rc,
+		BackUpConfig: BackupConfig{
+			Age:       time.Hour * 24,
+			BatchSize: 100,
+		},
 	}
 
 	newReceiver := func(c cluster.ICluster) *taskReceiver {
@@ -1095,12 +1114,16 @@ func commonTaskxRedis(cluster1, cluster2, cluster3 cluster.ICluster, rc v2.Redis
 	}
 	newDispatcher := func(c cluster.ICluster, r *taskReceiver) *taskDispatcher {
 		return &taskDispatcher{
-			Cluster:                c,
-			TaskDao:                taskDao,
-			TaskBakDao:             taskBakDao,
-			SubtaskDao:             subtaskDao,
-			SubtaskBakDao:          subtaskBakDao,
-			TaskEdgeDao:            taskEdgeDao,
+			Cluster:       c,
+			TaskDao:       taskDao,
+			TaskBakDao:    taskBakDao,
+			SubtaskDao:    subtaskDao,
+			SubtaskBakDao: subtaskBakDao,
+			TaskEdgeDao:   taskEdgeDao,
+			BackupManager: &backup.RedisBackupManager{
+				RedisClient: rc,
+				TaskDao:     taskDao,
+			},
 			cfg:                    cfg,
 			TaskReceiver:           r,
 			allocateWorkerInflight: inflight.NewInFlight(),

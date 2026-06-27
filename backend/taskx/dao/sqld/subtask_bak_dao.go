@@ -9,7 +9,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-const DefaultTableNameOfSubtaskBak = "subtask_bak"
+const DefaultTableNameOfSubtaskBak = "subtask_archive"
 
 type subtaskBakDAO struct {
 	client    *dbv1.Client
@@ -45,6 +45,29 @@ func (d *subtaskBakDAO) GetStore() dao.Store { return d.store }
 
 func (d *subtaskBakDAO) Insert(ctx context.Context, data *model.SubtaskBak) (int64, error) {
 	return d.client.GetRowsAffected(d.db(ctx).NewInsert().Model(data).ModelTableExpr(d.tableName).Exec(ctx))
+}
+
+func (d *subtaskBakDAO) BatchInsert(ctx context.Context, data []model.SubtaskBak) (int64, error) {
+	if len(data) == 0 {
+		return 0, nil
+	}
+	pageNumber := 1
+	batch := 50
+	count := int64(0)
+	for {
+		canSplit, start, end := dbv1.SplitIndex(pageNumber, batch, len(data))
+		if !canSplit {
+			break
+		}
+		batchList := data[start:end]
+		cnt, err := d.client.GetRowsAffected(d.db(ctx).NewInsert().Model(&batchList).ModelTableExpr(d.tableName).Exec(ctx))
+		if err != nil {
+			return count, err
+		}
+		count += cnt
+		pageNumber++
+	}
+	return count, nil
 }
 
 func (d *subtaskBakDAO) GetByID(ctx context.Context, id string) (*model.SubtaskBak, error) {

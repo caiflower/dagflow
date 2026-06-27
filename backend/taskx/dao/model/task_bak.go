@@ -9,7 +9,7 @@ import (
 
 // TaskBak generate from table task_bak
 type TaskBak struct {
-	bun.BaseModel    `bun:"table:task_bak"`
+	bun.BaseModel    `bun:"table:task_archive"`
 	ID               string     `bun:"id,pk,notnull" json:"id"`                   // 任务ID
 	RequestID        string     `bun:"request_id" json:"requestID"`               // 请求ID
 	TaskName         string     `bun:"task_name" json:"taskName"`                 // 任务名称

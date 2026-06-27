@@ -247,3 +247,47 @@ func parseBool(s string) bool {
 func cmd(client v2.RedisClient) v2.Cmdable {
 	return client.Cmd()
 }
+
+// --- Public key builders for external use (e.g., redisBackupManager) ---
+
+func TaskKey(prefix, id string) string {
+	if prefix == "" {
+		prefix = DefaultKeyPrefix
+	}
+	return fmt.Sprintf("%s:task:{%s}", prefix, id)
+}
+
+func SubtaskKey(prefix, id string) string {
+	if prefix == "" {
+		prefix = DefaultKeyPrefix
+	}
+	return fmt.Sprintf("%s:subtask:{%s}", prefix, id)
+}
+
+func EdgeKey(prefix, id string) string {
+	if prefix == "" {
+		prefix = DefaultKeyPrefix
+	}
+	return fmt.Sprintf("%s:edge:{%s}", prefix, id)
+}
+
+func TodoSetKey(prefix string) string {
+	if prefix == "" {
+		prefix = DefaultKeyPrefix
+	}
+	return prefix + ":todo"
+}
+
+func SubtaskIndexKey(prefix, taskID string) string {
+	if prefix == "" {
+		prefix = DefaultKeyPrefix
+	}
+	return fmt.Sprintf("%s:task:{%s}:subtasks", prefix, taskID)
+}
+
+func EdgeIndexKey(prefix, taskID string) string {
+	if prefix == "" {
+		prefix = DefaultKeyPrefix
+	}
+	return fmt.Sprintf("%s:task:{%s}:edges", prefix, taskID)
+}

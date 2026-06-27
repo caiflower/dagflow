@@ -179,7 +179,7 @@ type Processor func(ctx interface{}, data any) (any, error)
 
 // SubtaskSettings 子任务的可扩展 JSON 配置，存储在 DB 的 settings 字段中
 type SubtaskSettings struct {
-	BranchConfig *BranchConfig `json:"branch_config,omitempty"`
+	BranchConfig   *BranchConfig  `json:"branch_config,omitempty"`
 	Protocol       string         `json:"protocol,omitempty"`
 	ProtocolConfig map[string]any `json:"protocolConfig,omitempty"`
 }
@@ -369,9 +369,13 @@ func (g *dagGraph) AddBranch(nodeKey string, branch *Branch) error {
 	}
 
 	// 添加控制边: branch subtask → 每个目标节点（跳过尚不存在的节点，编译时校验）
+	// 同时添加数据边: parent → end node
 	for endKey := range branch.EndNodes {
 		if _, exists := g.nodes[endKey]; exists {
 			if err := g.AddEdge(branchKey, endKey, ControlEdge); err != nil {
+				return err
+			}
+			if err := g.AddEdge(nodeKey, endKey, DataEdge); err != nil {
 				return err
 			}
 		}

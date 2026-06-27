@@ -72,12 +72,17 @@ func isBranchNode(nodes []FlowNode, id string) bool {
 // FlowToTask 将 Flow 转换为 taskx.Task
 // providerFactory: 根据协议名和配置创建 ExecutorProvider
 // nodeInputs: 可选的节点输入参数 (nodeName → JSON input)
-func FlowToTask(flow *model.Flow, providerFactory func(protocol string, config map[string]any) (executor.ExecutorProvider, error), nodeInputs map[string]string) (*taskx.Task, error) {
+func FlowToTask(flow *model.Flow, providerFactory func(protocol string, config map[string]any) (executor.ExecutorProvider, error), nodeInputs map[string]string) (*taskx.Task, []FlowNode, []FlowEdge, error) {
 	nodes, edges, err := ParseFlowJSON(flow)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
-	return FlowToTaskWithNodes(flow.ID, nodes, edges, providerFactory, nodeInputs)
+
+	task, err := FlowToTaskWithNodes(flow.ID, nodes, edges, providerFactory, nodeInputs)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return task, nodes, edges, nil
 }
 
 // FlowToTaskWithNodes creates a taskx.Task directly from nodes and edges (for testing)

@@ -1420,3 +1420,67 @@ func TestCompile_AssignableTypes(t *testing.T) {
 	assert.NotNil(t, err, "should detect type mismatch on edge two -> three")
 	assert.Contains(t, err.Error(), "type mismatch")
 }
+
+// TestAddBranch_DataEdgeToEndNodes verifies that AddBranch adds DataEdge
+// from the parent node to each end node, so the parent's output data
+// flows to whichever child the branch selects at runtime.
+func TestAddBranch_DataEdgeToEndNodes(t *testing.T) {
+	task := NewTask("data-flow-test")
+
+	// Use providers with compatible types for data flow
+	strExec := executor.NewLocalExecutor(func(ctx context.Context, input string) (string, error) {
+		return input, nil
+	})
+
+	parent := NewSubtask("parent", strExec)
+	pathA := NewSubtask("pathA", strExec)
+	pathB := NewSubtask("pathB", strExec)
+	end := NewSubtask("end", strExec)
+
+	_ = task.AddSubtask(parent)
+	_ = task.AddSubtask(pathA)
+	_ = task.AddSubtask(pathB)
+	_ = task.AddSubtask(end)
+
+	// Add branch: parent -> branch -> {pathA, pathB}
+	_ = task.AddBranch(parent, &Branch{
+		ConditionProvider: executor.NewLocalExecutor(func(ctx context.Context, input string) (string, error) {
+			return pathA.GetID(), nil
+		}),
+		EndNodes: map[string]bool{pathA.GetID(): true, pathB.GetID(): true},
+	})
+	_ = task.AddEdge(pathA, end)
+	_ = task.AddEdge(pathB, end)
+
+	// Verify data edges exist from parent to end nodes in the graph
+	// (before compile, the graph should have data edges)
+	dataPredsA := task.dag.dataPred[pathA.GetID()]
+	dataPredsB := task.dag.dataPred[pathB.GetID()]
+
+	assert.Contains(t, dataPredsA, parent.GetID(),
+		"pathA should have parent as a data predecessor")
+	assert.Contains(t, dataPredsB, parent.GetID(),
+		"pathB should have parent as a data predecessor")
+
+	// Compile should succeed (types are compatible)
+	_, err := task.Compile()
+	assert.NoError(t, err, "compile should succeed with compatible types")
+
+	// Verify runtime: start -> branch subtask -> {pathA (selected), pathB (skipped)}
+	_ = task.UpdateSubtaskState(parent.GetID(), NodeSucceeded)
+
+	next := task.NextSubTasks()
+	assert.Equal(t, 1, len(next))
+	assert.True(t, strings.HasPrefix(next[0].GetName(), "branch_"), "branch subtask should be next after parent")
+
+	// Execute branch subtask (selects pathA)
+	branchSt := next[0]
+	_ = task.UpdateSubtaskState(branchSt.GetID(), NodeSucceeded)
+
+	// Manually skip pathB (simulates branch selection)
+	_ = task.SkipSubtask(pathB.GetID())
+
+	next = task.NextSubTasks()
+	assert.Equal(t, 1, len(next))
+	assert.Equal(t, "pathA", next[0].GetName(), "pathA should be selected after branch")
+}

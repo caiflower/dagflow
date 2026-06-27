@@ -67,14 +67,8 @@ func (s *ExecutionService) Run(ctx context.Context, req *RunFlowReq) (*Execution
 		return nil, e.NewApiError(e.NotFound, fmt.Sprintf("flow %s not found", req.FlowID), err)
 	}
 
-	// 解析节点和边
-	flowNodes, flowEdges, err := converter.ParseFlowJSON(flow)
-	if err != nil {
-		return nil, e.NewApiError(e.InvalidArgument, err.Error(), err)
-	}
-
 	// 构建 taskx.Task
-	task, err := converter.FlowToTask(flow, createProvider, req.NodeInputs)
+	task, flowNodes, flowEdges, err := converter.FlowToTask(flow, createProvider, req.NodeInputs)
 	if err != nil {
 		return nil, e.NewApiError(e.InvalidArgument, err.Error(), err)
 	}

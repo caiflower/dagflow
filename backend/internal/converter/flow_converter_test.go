@@ -8,9 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// echoProvider returns a provider that echoes its input as output
-func echoProvider(protocol string, config map[string]any) (executor.ExecutorProvider, error) {
-	return executor.NewLocalExecutor(func(ctx context.Context, input map[string]any) (string, error) {
+// stringProvider returns a provider that echoes its input as output
+// stringProvider returns a provider with string input/output for type-compatible data flow
+func stringProvider(protocol string, config map[string]any) (executor.ExecutorProvider, error) {
+	return executor.NewLocalExecutor(func(ctx context.Context, input string) (string, error) {
 		return "", nil
 	}), nil
 }
@@ -19,7 +20,7 @@ func echoProvider(protocol string, config map[string]any) (executor.ExecutorProv
 // The returned provider always selects the given targetName.
 func branchProviderFactory(targetName string) func(string, map[string]any) (executor.ExecutorProvider, error) {
 	return func(protocol string, config map[string]any) (executor.ExecutorProvider, error) {
-		return executor.NewLocalExecutor(func(ctx context.Context, input map[string]any) (string, error) {
+		return executor.NewLocalExecutor(func(ctx context.Context, input string) (string, error) {
 			return targetName, nil
 		}), nil
 	}
@@ -69,7 +70,7 @@ func TestFlowToTask_NestedBranch(t *testing.T) {
 	}
 
 	providerFactory := func(protocol string, config map[string]any) (executor.ExecutorProvider, error) {
-		return executor.NewLocalExecutor(func(ctx context.Context, input map[string]any) (string, error) {
+		return executor.NewLocalExecutor(func(ctx context.Context, input string) (string, error) {
 			return "innerA", nil
 		}), nil
 	}
@@ -92,7 +93,7 @@ func TestFlowToTask_SkipBranchWithOneSuccessor(t *testing.T) {
 		{ID: "e2", Source: "n2", Target: "n3"}, // only 1 successor — not a real branch
 	}
 
-	task, err := FlowToTaskWithNodes("test-skip", nodes, edges, echoProvider, nil)
+	task, err := FlowToTaskWithNodes("test-skip", nodes, edges, stringProvider, nil)
 	assert.NoError(t, err)
 
 	// Should compile without error (branch node simply skipped)
@@ -115,7 +116,7 @@ func TestFlowToTask_BranchProviderMustReturnString(t *testing.T) {
 
 	// Provider returns int instead of string
 	badFactory := func(protocol string, config map[string]any) (executor.ExecutorProvider, error) {
-		return executor.NewLocalExecutor(func(ctx context.Context, input map[string]any) (int, error) {
+		return executor.NewLocalExecutor(func(ctx context.Context, input string) (int, error) {
 			return 42, nil
 		}), nil
 	}

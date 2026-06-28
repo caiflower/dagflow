@@ -77,3 +77,7 @@ func Execution_Get_Handler(srv interface{}, ctx context.Context, dec func(interf
 func Execution_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	return _ExecutionService_List_Handler(srv, ctx, dec, interceptor)
 }
+
+func ExecutionService_Retry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	return _ExecutionService_Retry_Handler(srv, ctx, dec, interceptor)
+}

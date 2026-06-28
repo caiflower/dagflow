@@ -52,6 +52,30 @@ func (s *ExecutionGrpcService) List(ctx context.Context, req *pb.ListExecutionRe
 	return &pb.ListExecutionResponse{Items: items, Total: int32(total)}, nil
 }
 
+func (s *ExecutionGrpcService) Retry(ctx context.Context, req *pb.RetryExecutionRequest) (*pb.RetryExecutionResponse, error) {
+	if req.Id == "" {
+		return &pb.RetryExecutionResponse{
+			Success: false,
+			Message: "execution id is required",
+		}, nil
+	}
+
+	count, err := s.svc.Retry(ctx, req.Id)
+	if err != nil {
+		return &pb.RetryExecutionResponse{
+			Success:            false,
+			Message:            err.Error(),
+			ResetSubtasksCount: int32(count),
+		}, nil
+	}
+
+	return &pb.RetryExecutionResponse{
+		Success:            true,
+		Message:            "Execution retry initiated successfully",
+		ResetSubtasksCount: int32(count),
+	}, nil
+}
+
 func execToProto(e *service.Execution) *pb.Execution {
 	if e == nil {
 		return nil

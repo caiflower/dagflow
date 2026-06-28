@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { toast } from '../store/toastStore';
-import { Play, Zap, Clock, ChevronDown, ChevronRight, ChevronLeft, Terminal, Globe, Search, X, Filter } from 'lucide-react';
+import { Play, Zap, Clock, ChevronDown, ChevronRight, ChevronLeft, Terminal, Globe, Search, X, Filter, RotateCcw } from 'lucide-react';
 import { useExecutionStore } from '../store';
 import { useFlowStore } from '../store';
 import { flowApi, executionApi, ApiError } from '../api/client';
@@ -147,6 +147,35 @@ export default function ExecutionPage() {
   const [filterFlowId, setFilterFlowId] = useState<string | null>(null);
   const [searchId, setSearchId] = useState('');
   const [searchError, setSearchError] = useState('');
+  const [retryingExecId, setRetryingExecId] = useState<string | null>(null);
+
+  const handleRetry = async (execId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent expanding the execution detail
+    setRetryingExecId(execId);
+    try {
+      const result = await executionApi.retry(execId);
+      if (result.success) {
+        toast.success(`重试成功，已重置 ${result.reset_subtasks_count} 个子任务`);
+        // Reload the execution to show updated state
+        await loadExecutions(page, pageSize, filterFlowId || undefined);
+        // If this execution is expanded, refresh its detail
+        if (expandedExecId === execId) {
+          const exec = await executionApi.get(execId);
+          setExpandedExec(exec);
+          if (exec.state === 'running' || exec.state === 'pending') {
+            pollExecution(execId);
+          }
+        }
+      } else {
+        toast.error(result.message || '重试失败');
+      }
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : '重试失败';
+      toast.error(msg);
+    } finally {
+      setRetryingExecId(null);
+    }
+  };
 
   const handleSearchExec = async () => {
     const id = searchId.trim();
@@ -415,6 +444,18 @@ export default function ExecutionPage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                {exec.state === 'failed' && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={(e) => handleRetry(exec.id, e)}
+                    loading={retryingExecId === exec.id}
+                    disabled={retryingExecId === exec.id}
+                  >
+                    <RotateCcw size={12} />
+                    重试
+                  </Button>
+                )}
                 <Badge variant={stateBadgeVariant[exec.state] || 'default'} dot>
                   {exec.state}
                 </Badge>

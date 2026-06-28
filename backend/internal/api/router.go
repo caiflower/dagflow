@@ -49,6 +49,7 @@ func RegisterRoutes(engine *web.Engine) {
 	v1.GRPC("POST", "/executions/run", pb.Execution_Run_Handler, executionGrpcSvc)
 	v1.GRPC("GET", "/executions/:id", pb.Execution_Get_Handler, executionGrpcSvc)
 	v1.GRPC("GET", "/executions", pb.Execution_List_Handler, executionGrpcSvc)
+	v1.GRPC("POST", "/executions/:id/retry", pb.ExecutionService_Retry_Handler, executionGrpcSvc)
 
 	// ===== Node Registry Service =====
 	v1.GRPC("GET", "/nodes", remote_executor.NodeRegistry_ListNodes_Handler, nodeRegSvc)

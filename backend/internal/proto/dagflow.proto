@@ -152,6 +152,7 @@ service ExecutionService {
   rpc Run(RunFlowRequest) returns (ExecutionResponse);
   rpc Get(GetExecutionRequest) returns (ExecutionResponse);
   rpc List(ListExecutionRequest) returns (ListExecutionResponse);
+  rpc Retry(RetryExecutionRequest) returns (RetryExecutionResponse);
 }
 
 message NodeStatus {
@@ -209,4 +210,15 @@ message ExecutionResponse {
 message ListExecutionResponse {
   repeated Execution items = 1;
   int32 total = 2;
+}
+
+message RetryExecutionRequest {
+  // @gotags: path:"id"
+  string id = 1;
+}
+
+message RetryExecutionResponse {
+  bool success = 1;
+  string message = 2;
+  int32 reset_subtasks_count = 3;
 }

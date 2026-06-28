@@ -36,7 +36,7 @@ func (s *taskXServiceServer) DeliverSubtaskRollback(ctx context.Context, req *pr
 	return &proto.DeliverResponse{}, nil
 }
 
-func (s *taskXServiceServer) HandleTaskImmediately(ctx context.Context, req *proto.HandleTaskImmediatelyRequest) (*proto.HandleTaskImmediatelyResponse, error) {
+func (s *taskXServiceServer) HandleTaskImmediately(_ context.Context, req *proto.HandleTaskImmediatelyRequest) (*proto.HandleTaskImmediatelyResponse, error) {
 	s.receiver.TaskDispatcher.enqueueTaskIDs(req.TaskIds)
 	return &proto.HandleTaskImmediatelyResponse{}, nil
 }

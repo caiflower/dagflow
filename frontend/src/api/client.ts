@@ -88,6 +88,8 @@ export const executionApi = {
     api.get(`/executions/${id}`).then(r => unwrap<{ execution: Execution }>(r).execution),
   list: (page = 1, pageSize = 20, flowId?: string) =>
     api.get('/executions', { params: { page, page_size: pageSize, ...(flowId ? { flow_id: flowId } : {}) } }).then(r => unwrap<PageResult<Execution>>(r)),
+  retry: (id: string) =>
+    api.post(`/executions/${id}/retry`).then(r => unwrap<{ success: boolean; message: string; reset_subtasks_count: number }>(r)),
 };
 
 // Node Registry types

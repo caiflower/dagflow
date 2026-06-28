@@ -1369,3 +1369,103 @@ func (t *taskDispatcher) backupTask() {
 		logger.Info("[backupTask] backed up %d tasks", count)
 	}
 }
+
+// RetryTask resets a failed task to allow manual retry.
+// Only tasks in failed state and not archived (status > 0) can be retried.
+// Returns the number of subtasks reset and any error.
+func (t *taskDispatcher) RetryTask(ctx context.Context, taskID string) (int, error) {
+	// 1. Validate task exists and is in failed state
+	task, err := t.TaskDao.GetByID(ctx, taskID)
+	if err != nil {
+		logger.Error("[RetryTask] failed to get task %s: %v", taskID, err)
+		return 0, fmt.Errorf("task not found: %w", err)
+	}
+	if task == nil {
+		return 0, fmt.Errorf("task %s not found", taskID)
+	}
+
+	// 2. Check if task is archived (status <= 0 means archived/deleted)
+	if task.Status <= 0 {
+		return 0, fmt.Errorf("task %s is archived and cannot be retried", taskID)
+	}
+
+	// 3. Check if task is in failed state
+	if task.State != string(types.TaskFailed) {
+		return 0, fmt.Errorf("task %s is not in failed state (current: %s)", taskID, task.State)
+	}
+
+	// 4. Get all subtasks
+	subtasks, err := t.SubtaskDao.GetByTaskID(ctx, taskID)
+	if err != nil {
+		logger.Error("[RetryTask] failed to get subtasks for task %s: %v", taskID, err)
+		return 0, fmt.Errorf("failed to get subtasks: %w", err)
+	}
+
+	if len(subtasks) == 0 {
+		logger.Warn("[RetryTask] task %s has no subtasks", taskID)
+		return 0, fmt.Errorf("task %s has no subtasks", taskID)
+	}
+
+	// 5. Check if any subtasks have active rollback state (not completed/none)
+	for i := range subtasks {
+		subtask := &subtasks[i]
+		if subtask.Rollback != string(types.NoneRollback) {
+			return 0, fmt.Errorf("task %s has active rollback state and cannot be retried", taskID)
+		}
+	}
+
+	// 6. Reset failed subtasks (downstream dependencies will be handled by dispatcher)
+	resetCount := 0
+	for i := range subtasks {
+		subtask := &subtasks[i]
+
+		// Only reset failed subtasks (preserve succeeded/skipped)
+		if subtask.State != string(types.TaskFailed) {
+			continue
+		}
+
+		// Reset state to pending and clear output
+		if err := t.SubtaskDao.SetOutputAndState(ctx, subtask.ID, "", string(types.TaskPending)); err != nil {
+			logger.Error("[RetryTask] failed to reset state for subtask %s: %v", subtask.ID, err)
+			return resetCount, fmt.Errorf("failed to reset subtask %s state: %w", subtask.ID, err)
+		}
+
+		// Reset retry counter to initial value
+		retryCount := task.Retry
+		if retryCount <= 0 {
+			retryCount = types.DefaultRetryCount
+		}
+		if err = t.SubtaskDao.SetRetry(ctx, subtask.ID, retryCount); err != nil {
+			logger.Error("[RetryTask] failed to reset retry for subtask %s: %v", subtask.ID, err)
+			return resetCount, fmt.Errorf("failed to reset subtask %s retry: %w", subtask.ID, err)
+		}
+
+		resetCount++
+		logger.Info("[RetryTask] reset subtask %s (task=%s) to pending state", subtask.ID, taskID)
+	}
+
+	if resetCount == 0 {
+		return 0, fmt.Errorf("no failed subtasks found to retry in task %s", taskID)
+	}
+
+	// 7. Reset task state to pending
+	if _, err := t.TaskDao.SetState(ctx, taskID, string(types.TaskPending)); err != nil {
+		logger.Error("[RetryTask] failed to reset task state for %s: %v", taskID, err)
+		return resetCount, fmt.Errorf("failed to reset task state: %w", err)
+	}
+
+	// 8. Clear task cache to force DAG recompilation
+	t.taskCache.Delete(taskID)
+
+	logger.Info("[RetryTask] task %s reset to pending, %d subtasks reset, notifying leader", taskID, resetCount)
+
+	// 9. Notify leader to handle task immediately
+	t.notifyLeaderHandleTaskImmediately(ctx, taskID)
+
+	return resetCount, nil
+}
+
+// RetryTask is the public API to retry a failed task
+func RetryTask(ctx context.Context, taskID string) (int, error) {
+	return SingletonTaskDispatcher.RetryTask(ctx, taskID)
+}

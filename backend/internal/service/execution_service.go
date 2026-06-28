@@ -368,6 +368,27 @@ func mapTaskxState(state string) string {
 	}
 }
 
+// Retry 重试失败的执行
+func (s *ExecutionService) Retry(ctx context.Context, execID string) (int, error) {
+	// 1. 从执行记录表查 task_id
+	record, err := s.ExecutionRecordDAO.GetByID(ctx, execID)
+	if err != nil {
+		return 0, e.NewApiError(e.NotFound, fmt.Sprintf("execution %s not found", execID), err)
+	}
+	if record == nil || record.TaskID == "" {
+		return 0, fmt.Errorf("execution %s not found or has no task ID", execID)
+	}
+
+	// 2. 调用 taskx.RetryTask
+	count, err := taskx.RetryTask(ctx, record.TaskID)
+	if err != nil {
+		return 0, e.NewApiError(e.InvalidArgument, err.Error(), err)
+	}
+
+	logger.Info("execution %s retry initiated, taskID=%s, reset %d subtasks", execID, record.TaskID, count)
+	return count, nil
+}
+
 // InitExec 注册 ExecutionService bean
 func InitExec() {
 	bean.AddBean(&ExecutionService{})
